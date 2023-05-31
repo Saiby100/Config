@@ -1,0 +1,38 @@
+ex ()
+{
+	if [ -f $1 ] ; then
+		case $1 in
+			*.tar.bz2)	tar xjf $1	;;
+			*.tar.gz)	tar xzf $1	;;
+			*.bz2)		bunzip2 $1	;;
+			*.rar)		unrar x $1	;;
+			*.gz)		gunzip  $1	;;
+			*.tar)		tar xf 	$1	;;
+			*.tbz2)		tar xjf $1	;;
+			*.tgz)		tar xzf $1	;;
+			*.zip)		unzip	$1	;;
+			*.Z)		uncompress $1;;
+			*7z)		7z x	$1	;;
+			*)			echo "'$1' cannot be extracted via ex()" ;;
+		esac
+	else
+		echo "'$1' is not a valid file" 
+	fi
+}
+
+# Shortened
+alias ll='ls -lah'
+alias la='ls -a'
+alias py="python3"
+
+# Configure Files
+alias zrc="$EDITOR $HOME/.config/zsh/.zshrc"
+alias zalias="$EDITOR $HOME/.config/zsh/.zsh/aliasrc"
+
+# Change directory shortcuts
+alias nwp='cd ~/Documents/netw/projects'
+alias cwp='cd ~/Documents/conc/projects/25081551-rw314'
+alias mwp='cd ~/Documents/projects'
+alias scale='export GDK_SCALE=2'
+
+export EDITOR=nvim
