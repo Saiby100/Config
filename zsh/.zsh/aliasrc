@@ -27,7 +27,7 @@ alias py="python3"
 
 # Configure Files
 alias zrc="$EDITOR $HOME/.config/zsh/.zshrc"
-alias zalias="$EDITOR $HOME/.config/zsh/.zsh/aliasrc"
+alias zal="$EDITOR $HOME/.config/zsh/.zsh/aliasrc"
 
 # Change directory shortcuts
 alias nwp='cd ~/Documents/netw/projects'
