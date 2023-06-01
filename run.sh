@@ -7,7 +7,7 @@ CONFIG_PATH="$HOME/.config"
 
 
 # Move files
-mkdir -p CONFIG_PATH
+mkdir -p $CONFIG_PATH
 cp -v .zshenv $HOME
 cp -rv ./zsh $CONFIG_PATH
 cp -rv nvim $CONFIG_PATH
