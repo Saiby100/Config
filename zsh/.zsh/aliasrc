@@ -32,9 +32,8 @@ alias zrc="$EDITOR $HOME/.config/zsh/.zshrc"
 alias zal="$EDITOR $HOME/.config/zsh/.zsh/aliasrc"
 
 # Change directory shortcuts
-alias nwp='cd ~/Documents/netw/projects'
-alias cwp='cd ~/Documents/conc/projects/25081551-rw314'
 alias mwp='cd ~/Documents/projects'
+alias notes='cd ~/Documents/uni'
 alias scale='export GDK_SCALE=2'
 
 export EDITOR=nvim
