@@ -10,6 +10,7 @@ update() {
 	mkdir -p $CONFIG_PATH
 	cp -v .zshenv $HOME
 	cp -rv ./zsh $CONFIG_PATH
+	cp -rv ./nvim $CONFIG_PATH
 }
 
 while getopts 'su' OPTION; do
