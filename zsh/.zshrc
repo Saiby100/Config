@@ -47,7 +47,7 @@ function git_remote_status() {
     if [[ -n $remote ]]; then
       local tracking=$(git rev-parse --symbolic-full-name --abbrev-ref @{u} 2>/dev/null)
       if [[ $tracking == $remote ]]; then
-        echo "%F{cyan}$(git rev-parse --abbrev-ref HEAD)⎇ %f"  # Up to date
+        echo "%F{#70e9ff}$(git rev-parse --abbrev-ref HEAD)⎇ %f"  # Up to date
       else
         echo "%F{red}$(git rev-parse --abbrev-ref HEAD)⎇ %f"  # Not up to date
       fi
