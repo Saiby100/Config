@@ -4,8 +4,10 @@
 
 # Setting Prompt text
 setopt prompt_subst
-PROMPT=' %B%F{magenta}%~%b
- %B$(git_remote_status)%b%F{cyan}%B❯%b%f '
+#PROMPT=' %B%F{magenta}%~%b
+# %B$(git_remote_status)%b%F{cyan}%B❯%b%f '
+PROMPT=' %B%F{#de9dac}%~%b
+ %B$(git_remote_status)%b%F{#70e9ff}%B❯%b%f '
 
 #zstyle ':vcs_info:*' check-for-changes true
 
