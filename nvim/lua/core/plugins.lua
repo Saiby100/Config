@@ -5,5 +5,6 @@ return require('packer').startup(function()
 	use 'nvim-tree/nvim-web-devicons'
 	use { 'catppuccin/nvim', as = "catppuccin" }
 	use 'nvim-treesitter/nvim-treesitter'
+	use {'akinsho/toggleterm.nvim', tag = "*" }
 end)
 
