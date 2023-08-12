@@ -15,3 +15,6 @@ vim.api.nvim_set_keymap('n', '<C-f>', ':NvimTreeToggle<CR>', { noremap = true})
 
 -- Split Screen
 vim.api.nvim_set_keymap('n', '<C-v>', ':vsp<CR>', { noremap = true })
+
+-- Prevents pasted over line from going into register
+vim.keymap.set('x', 'p', '\"_dP')
