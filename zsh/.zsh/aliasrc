@@ -23,21 +23,18 @@ ex ()
 # Shortened
 alias ll='ls -lah'
 alias la='ls -a'
-alias py="python3"
-alias update="sudo apt update && sudo apt-get upgrade && flatpak update"
-alias ref="source $HOME/.config/zsh/.zshrc"
+alias py='python3'
+alias update='sudo apt update && sudo apt-get upgrade && flatpak update'
+alias ref='source $HOME/.config/zsh/.zshrc'
+alias activate="source bin/activate"
 
 # Configure Files
-alias zrc="nvim $HOME/.config/zsh/.zshrc"
-alias zal="nvim $HOME/.config/zsh/.zsh/aliasrc"
+alias zrc='nvim $HOME/.config/zsh/.zshrc'
+alias zal='nvim $HOME/.config/zsh/.zsh/aliasrc'
 
 # Change directory shortcuts
 alias mwp='cd ~/Documents/projects'
 alias notes='cd ~/Documents/uni'
-alias herse='cd ~/Documents/pracs/Herse-cs344'
-alias swp='cd ~/Documents/pracs/25081551-cs344-tuts'
-alias wwp='cd ~/Documents/pracs/25081551'
-alias scale='export GDK_SCALE=2'
 alias win10='virt-viewer --connect=qemu:///system --domain-name win10'
 
 export EDITOR=nvim

@@ -4,7 +4,7 @@ return require('packer').startup(function()
 	use 'nvim-tree/nvim-tree.lua'
 	use 'nvim-tree/nvim-web-devicons'
 	use { 'catppuccin/nvim', as = "catppuccin" }
-	use 'nvim-treesitter/nvim-treesitter'
+	use ({'nvim-treesitter/nvim-treesitter', run = ":TSUpdate",})
 	use {'akinsho/toggleterm.nvim', tag = "*" }
 	use {
 	  'VonHeikemen/lsp-zero.nvim',
@@ -21,6 +21,7 @@ return require('packer').startup(function()
 		{'L3MON4D3/LuaSnip'},     -- Required
 	  }
 	}
+	use({ "iamcco/markdown-preview.nvim", run = "cd app && npm install", setup = function() vim.g.mkdp_filetypes = { "markdown" } end, ft = { "markdown" }, })
 
 end)
 

@@ -55,8 +55,11 @@ function git_remote_status() {
   fi
 }
 
+#Path Variables
+export PATH=$PATH:/home/saiby/.kotlinc/bin #Kotlin compiler
+export PATH=$PATH:/usr/local/gradle/gradle-8.3/bin #Gradle
+
 # Load ; should be last.
 source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh 2>/dev/null
 source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh 2>/dev/null
 source /usr/share/autojump/autojump.zsh 2>/dev/null
-

@@ -5,8 +5,8 @@ end
 
 toggleterm.setup({
 	size = 20,
-	open_mapping = [[<C-_>]],
 	hide_numbers = true,
+	open_mapping = [[<C-p>]],
 	shell = vim.o.shell,
 	direction = "float",
 	float_opts = {
