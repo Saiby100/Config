@@ -21,3 +21,6 @@ vim.api.nvim_set_keymap('n', '<leader>s', ':vsp<CR>', { noremap = true })
 
 -- Prevents pasted over line from going into register
 vim.keymap.set('x', 'p', '\"_dP')
+
+-- Markdown Preview
+vim.keymap.set('n', '<leader>p', ':MarkdownPreview<CR>', { noremap = true })
