@@ -28,6 +28,10 @@ alias update='sudo apt update && sudo apt-get upgrade && flatpak update'
 alias ref='source $HOME/.config/zsh/.zshrc'
 alias activate="source bin/activate"
 
+#
+alias open='xdg-open $1 &>/dev/null'
+alias rn='mv $1 $2'
+
 # Configure Files
 alias zrc='nvim $HOME/.config/zsh/.zshrc'
 alias zal='nvim $HOME/.config/zsh/.zsh/aliasrc'
