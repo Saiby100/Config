@@ -12,12 +12,6 @@ read opt
 echo "Backup or Restore [b/r]? "
 read option
 
-#Functions
-set_settings() {
-	gsettings set org.gnome.shell.app-switcher current-workspace-only true #Only alt+tab in current workspace
-	gsettings set org.gnome.shell.extensions.dash-to-dock background-opacity 0.4 #Dock opacity
-}
-
 backup() {
     cp -rvf $ZSH_PATH $1
     cp -rvf $HOME/.zshenv $1
@@ -53,7 +47,6 @@ elif [ "$opt" = "n" ]; then
         backup $LINUX_PATH
     else
         echo "Restoring linux files..."
-        set_settings
         restore $LINUX_PATH
     fi
 else 
