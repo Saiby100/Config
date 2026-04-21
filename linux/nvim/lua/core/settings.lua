@@ -13,6 +13,3 @@ vim.opt.clipboard = "unnamedplus" -- use clipboard
 vim.opt.scrolloff = 8
 vim.opt.incsearch = true
 
--- Theme
-vim.cmd.colorscheme "catppuccin"
-

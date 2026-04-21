@@ -13,15 +13,8 @@ vim.api.nvim_set_keymap('i', '<C-l>', '<Right>', { noremap = true })
 vim.api.nvim_set_keymap('i', '<C-k>', '<Up>', { noremap = true })
 vim.api.nvim_set_keymap('i', '<C-j>', '<Down>', { noremap = true })
 
--- NvimTree
-vim.api.nvim_set_keymap('n', '<leader>e', ':NvimTreeToggle<CR>', { noremap = true })
-
 -- Split Screen
 vim.api.nvim_set_keymap('n', '<leader>s', ':vsp<CR>', { noremap = true })
 
 -- Prevents pasted over line from going into register
 vim.keymap.set('x', 'p', '\"_dP')
-
--- Markdown Preview
-vim.keymap.set('n', '<leader>p', ':MarkdownPreview<CR>', { noremap = true })
-
