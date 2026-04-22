@@ -19,6 +19,7 @@ backup() {
         --exclude='.zcompcache' \
         --exclude='.zsh_history' \
         --exclude='.zsh_sessions' \
+        --exclude='.DS_Store' \
         "$ZSH_PATH" "$1"
     cp -vf "$HOME/.zshenv" "$1"
     rsync -av --delete \
