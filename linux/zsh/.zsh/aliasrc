@@ -31,6 +31,7 @@ alias activate="source bin/activate"
 #
 alias open='xdg-open $1 &>/dev/null'
 alias rn='mv $1 $2'
+alias cc='claude'
 
 # Configure Files
 alias zrc='nvim $HOME/.config/zsh/.zshrc'
@@ -40,5 +41,6 @@ alias zal='nvim $HOME/.config/zsh/.zsh/aliasrc'
 alias mwp='cd ~/Documents/projects'
 alias notes='cd ~/Documents/uni'
 alias win10='virt-viewer --connect=qemu:///system --domain-name win10'
+alias wp='cd ~/Developer'
 
 export EDITOR=nvim

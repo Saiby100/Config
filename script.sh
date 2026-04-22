@@ -4,6 +4,7 @@
 CONFIG_PATH="$HOME/.config"
 ZSH_PATH="$CONFIG_PATH/zsh"
 NVIM_PATH="$CONFIG_PATH/nvim"
+CLAUDE_PATH="$HOME/.claude"
 
 #Get user input
 echo "Using Windows? [y/n]"
@@ -13,9 +14,31 @@ echo "Backup or Restore [b/r]? "
 read option
 
 backup() {
-    cp -rvf $ZSH_PATH $1
-    cp -rvf $HOME/.zshenv $1
-    cp -rvf $NVIM_PATH $1
+    rsync -av --delete \
+        --exclude='.zcompdump*' \
+        --exclude='.zcompcache' \
+        --exclude='.zsh_history' \
+        --exclude='.zsh_sessions' \
+        "$ZSH_PATH" "$1"
+    cp -vf "$HOME/.zshenv" "$1"
+    rsync -av --delete \
+        --exclude='.DS_Store' \
+        "$NVIM_PATH" "$1"
+    rsync -av --delete \
+        --exclude='backups/' \
+        --exclude='cache/' \
+        --exclude='downloads/' \
+        --exclude='file-history/' \
+        --exclude='ide/' \
+        --exclude='paste-cache/' \
+        --exclude='plugins/' \
+        --exclude='projects/' \
+        --exclude='session-env/' \
+        --exclude='sessions/' \
+        --exclude='shell-snapshots/' \
+        --exclude='history.jsonl' \
+        --exclude='.DS_Store' \
+        "$CLAUDE_PATH" "$1"
 }
 
 restore() {
@@ -23,6 +46,7 @@ restore() {
 	cp -v $1/.zshenv $HOME
 	cp -rv $1/zsh $CONFIG_PATH
 	cp -rv $1/nvim $CONFIG_PATH
+	cp -rv $1/.claude $HOME
 }
 
 if [ "$opt" = "y" ]; then
