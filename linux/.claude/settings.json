@@ -1,7 +1,67 @@
 {
-  "model": "opus[1m]",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Read(~/Developer/**)",
+      "Glob(~/Developer/**)",
+      "Grep(~/Developer/**)",
+      "Write(~/Developer/**)",
+      "mcp__ide__getDiagnostics",
+      "mcp__ide__executeCode",
+      "WebFetch",
+      "WebSearch",
+      "Bash(gh issue *)",
+      "Bash(gh branch *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr diff *)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm ldf:b*)",
+      "Bash(cd * && pnpm *)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm changeset *)",
+      "Bash(pnpm install *)",
+      "Bash(ls *~/Developer/*)",
+      "Bash(ls */Users/salahuddin/Developer/*)",
+      "Bash(find *~/Developer/*)",
+      "Bash(find */Users/salahuddin/Developer/*)",
+      "Bash(grep *~/Developer/*)",
+      "Bash(grep */Users/salahuddin/Developer/*)",
+      "Bash(cat *~/Developer/*)",
+      "Bash(cat */Users/salahuddin/Developer/*)",
+      "Bash(head *~/Developer/*)",
+      "Bash(head */Users/salahuddin/Developer/*)"
+    ],
+    "deny": [
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.gnupg/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/credentials*)",
+      "Cat(**/.env)",
+      "Cat(**/credentials*)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Write(**/.env)",
+      "Write(**/.env.*)"
+    ],
+    "defaultMode": "auto"
+  },
+  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh"
-  }
+  },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true
+  },
+  "effortLevel": "medium",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "skipAutoPermissionPrompt": true,
+  "voiceEnabled": true
 }
