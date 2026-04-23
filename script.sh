@@ -14,40 +14,37 @@ echo "Backup or Restore [b/r]? "
 read option
 
 backup() {
-    rsync -av --delete \
-        --exclude='.zcompdump*' \
-        --exclude='.zcompcache' \
-        --exclude='.zsh_history' \
-        --exclude='.zsh_sessions' \
-        --exclude='.DS_Store' \
-        "$ZSH_PATH" "$1"
+    mkdir -p "$1/zsh/.zsh"
     cp -vf "$HOME/.zshenv" "$1"
-    rsync -av --delete \
-        --exclude='.DS_Store' \
-        "$NVIM_PATH" "$1"
-    rsync -av --delete \
-        --exclude='backups/' \
-        --exclude='cache/' \
-        --exclude='downloads/' \
-        --exclude='file-history/' \
-        --exclude='ide/' \
-        --exclude='paste-cache/' \
-        --exclude='plugins/' \
-        --exclude='projects/' \
-        --exclude='session-env/' \
-        --exclude='sessions/' \
-        --exclude='shell-snapshots/' \
-        --exclude='history.jsonl' \
-        --exclude='.DS_Store' \
-        "$CLAUDE_PATH" "$1"
+    cp -vf "$ZSH_PATH/.zshrc" "$1/zsh/"
+    cp -vf "$ZSH_PATH/.p10k.zsh" "$1/zsh/"
+    cp -vf "$ZSH_PATH/.zsh/aliasrc" "$1/zsh/.zsh/"
+
+    mkdir -p "$1/nvim"
+    cp -vf "$NVIM_PATH/init.lua" "$1/nvim/"
+    cp -vf "$NVIM_PATH/lazy-lock.json" "$1/nvim/"
+    rsync -av --delete --exclude='.DS_Store' "$NVIM_PATH/lua" "$1/nvim/"
+
+    mkdir -p "$1/.claude"
+    cp -vf "$CLAUDE_PATH/settings.json" "$1/.claude/"
+    cp -vf "$CLAUDE_PATH/statusline-command.sh" "$1/.claude/"
 }
 
 restore() {
-	mkdir -p $CONFIG_PATH
-	cp -v $1/.zshenv $HOME
-	cp -rv $1/zsh $CONFIG_PATH
-	cp -rv $1/nvim $CONFIG_PATH
-	cp -rv $1/.claude $HOME
+	mkdir -p "$ZSH_PATH/.zsh"
+	cp -v "$1/.zshenv" "$HOME"
+	cp -v "$1/zsh/.zshrc" "$ZSH_PATH/"
+	cp -v "$1/zsh/.p10k.zsh" "$ZSH_PATH/"
+	cp -v "$1/zsh/.zsh/aliasrc" "$ZSH_PATH/.zsh/"
+
+	mkdir -p "$NVIM_PATH"
+	cp -v "$1/nvim/init.lua" "$NVIM_PATH/"
+	cp -v "$1/nvim/lazy-lock.json" "$NVIM_PATH/"
+	cp -rv "$1/nvim/lua" "$NVIM_PATH/"
+
+	mkdir -p "$CLAUDE_PATH"
+	cp -v "$1/.claude/settings.json" "$CLAUDE_PATH/"
+	cp -v "$1/.claude/statusline-command.sh" "$CLAUDE_PATH/"
 }
 
 if [ "$opt" = "y" ]; then

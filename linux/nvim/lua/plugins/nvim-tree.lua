@@ -11,6 +11,10 @@ return {
 			view = {
 				width = 25,
 			},
+			-- files.exclude
+			filters = {
+				custom = { "^dist$", "^node_modules$" },
+			},
 		})
 
 		local function is_modified_buffer_open(buffers)

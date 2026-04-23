@@ -1,12 +1,15 @@
 return {
 	"akinsho/toggleterm.nvim",
 	version = "*",
-	keys = { { "<C-p>", mode = { "n", "t" } } },
+	keys = {
+		{ "<C-A-p>", mode = { "n", "t" } },
+		{ "<leader>t2", "<cmd>2ToggleTerm direction=float<CR>", mode = { "n", "t" }, desc = "Second terminal" },
+	},
 	cmd = { "ToggleTerm", "TermExec" },
 	opts = {
 		size = 20,
 		hide_numbers = true,
-		open_mapping = [[<C-p>]],
+		open_mapping = [[<C-A-p>]],
 		shell = vim.o.shell,
 		direction = "float",
 		float_opts = {
