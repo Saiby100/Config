@@ -1,3 +1,7 @@
+if [ -z "$TMUX" ]; then
+  tmux new-session -A -s main
+fi
+
 # Load in version control information
 #autoload -Uz add-zsh-hook vcs_info 
 #add-zsh-hook precmd vcs_info
@@ -27,8 +31,6 @@ SAVEHIST=10000
 HISTFILE=~/.cache/zshhistory
 setopt appendhistory
 
-# Custom ZSH Binds
-bindkey '^ ' autosuggest-accept
 
 # Basic auto/tab complete:
 autoload -U compinit
