@@ -27,6 +27,10 @@ return {
           },
         },
         file_ignore_patterns = { "node_modules", "dist", "%.git/" },
+        vimgrep_arguments = {
+          "rg", "--color=never", "--no-heading", "--with-filename",
+          "--line-number", "--column", "--smart-case", "--binary-files=without-match",
+        },
       },
       pickers = {
         find_files = { hidden = true },

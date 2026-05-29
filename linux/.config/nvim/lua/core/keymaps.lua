@@ -63,3 +63,6 @@ map("n", "<A-S-j>", ":resize -2<CR>", opts)
 -- alt+shift+h/l : resize pane left/right (width)
 map("n", "<A-S-h>", ":vertical resize -5<CR>", opts)
 map("n", "<A-S-l>", ":vertical resize +5<CR>", opts)
+
+-- Toggle tmux pane zoom
+map("n", "<leader>m", function() vim.fn.system("tmux resize-pane -Z") end, opts)

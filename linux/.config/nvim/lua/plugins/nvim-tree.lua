@@ -9,11 +9,38 @@ return {
 			disable_netrw = true,
 			hijack_netrw = true,
 			view = {
-				width = 25,
+				width = 30,
+				side = "left",
 			},
-			-- files.exclude
+			renderer = {
+				indent_markers = { enable = true },
+				icons = {
+					glyphs = {
+						folder = {
+							arrow_closed = "›",
+							arrow_open = "⌄",
+						},
+					},
+				},
+				highlight_git = "name",
+				highlight_opened_files = "name",
+			},
 			filters = {
 				custom = { "^dist$", "^node_modules$" },
+				dotfiles = false,
+			},
+			git = {
+				enable = true,
+				ignore = false,
+			},
+			actions = {
+				open_file = {
+					quit_on_open = false,
+					window_picker = { enable = true },
+				},
+			},
+			update_focused_file = {
+				enable = true,
 			},
 		})
 
