@@ -43,31 +43,27 @@ This creates symlinks for:
 
 | Target | Symlink |
 |---|---|
-| `linux/.zshenv` | `~/.zshenv` |
-| `linux/.tmux.conf` | `~/.tmux.conf` |
-| `linux/.config/nvim` | `~/.config/nvim` |
-| `linux/.config/zsh` | `~/.config/zsh` |
-| `linux/.config/ghostty` | `~/.config/ghostty` |
+| `.zshenv` | `~/.zshenv` |
+| `.tmux.conf` | `~/.tmux.conf` |
+| `.config/nvim` | `~/.config/nvim` |
+| `.config/zsh` | `~/.config/zsh` |
+| `.config/ghostty` | `~/.config/ghostty` |
 
 After linking, install tmux plugins with `prefix + I` inside tmux.
 
 ## Structure
 
 ```
-linux/
-  .zshenv                  # Points ZDOTDIR to ~/.config/zsh
-  .tmux.conf               # Tmux config (prefix: Ctrl+Space)
-  .claude/                 # Claude Code settings
-  .config/
-    ghostty/config         # Terminal (JetBrainsMono Nerd Font)
-    nvim/                  # Neovim (lazy.nvim, onedark, LSP, telescope)
-    zsh/
-      .zshrc               # Shell config (prompt, history, completions)
-      .zsh/aliasrc          # Aliases and shortcuts
-windows/
-  keybinds.ahk             # AutoHotKey remaps
-  nvim/                    # Windows-specific Neovim config
-  zsh/                     # Windows-specific Zsh config
+.zshenv                        # Points ZDOTDIR to ~/.config/zsh
+.tmux.conf                     # Tmux config (prefix: Ctrl+Space)
+.claude/                       # Claude Code settings
+.config/
+  ghostty/config               # Terminal (One Dark Two, JetBrainsMono Nerd Font)
+  nvim/                        # Neovim (lazy.nvim, onedark, LSP, telescope)
+  zsh/
+    .zshrc                     # Shell config (prompt, history, completions)
+    .zsh/aliasrc               # Aliases and shortcuts
+keybinds.ahk                   # AutoHotKey remaps (Windows)
 ```
 
 ## Key Aliases

@@ -1,3 +1,8 @@
+-- Reload files changed outside of Neovim
+vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" }, {
+  command = "if mode() != 'c' | checktime | endif",
+})
+
 -- files.trimTrailingWhitespace + files.trimFinalNewlines
 vim.api.nvim_create_autocmd("BufWritePre", {
   pattern = "*",

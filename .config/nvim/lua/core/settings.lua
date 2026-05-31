@@ -17,3 +17,4 @@ vim.opt.incsearch = true
 vim.opt.hlsearch = true
 vim.opt.fixendofline = true       -- insertFinalNewline
 vim.opt.fillchars = { eob = ' ' }
+vim.opt.autoread = true

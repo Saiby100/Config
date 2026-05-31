@@ -26,10 +26,10 @@ return {
             ["<C-k>"] = actions.move_selection_previous,
           },
         },
-        file_ignore_patterns = { "node_modules", "dist", "%.git/" },
+        file_ignore_patterns = { "node_modules", "dist/", "%.git/" },
         vimgrep_arguments = {
           "rg", "--color=never", "--no-heading", "--with-filename",
-          "--line-number", "--column", "--smart-case", "--binary-files=without-match",
+          "--line-number", "--column", "--smart-case",
         },
       },
       pickers = {

@@ -1,5 +1,5 @@
 #!/bin/bash
-REPO_DIR="$(cd "$(dirname "$0")/linux" && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 mkdir -p "$HOME/.config"
 
