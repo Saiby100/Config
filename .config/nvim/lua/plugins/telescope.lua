@@ -19,6 +19,9 @@ return {
 
     telescope.setup({
       defaults = {
+        -- nvim-treesitter `main` branch dropped the parsers.ft_to_lang API that
+        -- telescope 0.1.x previewers call, so disable TS preview highlighting.
+        preview = { treesitter = false },
         -- VS Code quickOpen nav: ctrl+j/k next/prev
         mappings = {
           i = {
@@ -33,7 +36,24 @@ return {
         },
       },
       pickers = {
-        find_files = { hidden = true },
+        -- rg/fd respect .gitignore by default, so gitignored files like .env
+        -- never show up (`hidden = true` only adds non-ignored dotfiles). A
+        -- positive rg glob can't be added to whitelist them: it acts as a
+        -- restrictive filter and hides everything else. So union two passes:
+        --   1. normal listing (respects .gitignore) + --hidden for dotfiles
+        --   2. --no-ignore listing restricted to .env files, to force them in
+        -- node_modules/, dist/, etc. stay hidden (.gitignore + the
+        -- file_ignore_patterns above), while .env / .env.* always appear.
+        find_files = {
+          find_command = {
+            "sh",
+            "-c",
+            table.concat({
+              "rg --files --hidden --glob '!**/.git/*'",
+              "rg --files --no-ignore --glob '!**/.git/*' --glob '**/.env' --glob '**/.env.*'",
+            }, "; ") .. " | sort -u",
+          },
+        },
       },
     })
 
