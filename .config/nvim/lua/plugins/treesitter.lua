@@ -4,7 +4,7 @@ return {
 	lazy = false,
 	build = ":TSUpdate",
 	config = function()
-		require("nvim-treesitter.configs").setup({
+		require("nvim-treesitter").setup({
 			ensure_installed = {
 				"c", "lua", "python",
 				"javascript", "typescript", "tsx",
@@ -14,11 +14,6 @@ return {
 				"markdown", "markdown_inline",
 			},
 			auto_install = true,
-			highlight = { enable = true },
-			indent = {
-				enable = true,
-				disable = { "javascript", "typescript", "tsx" },
-			},
 		})
 	end,
 }
