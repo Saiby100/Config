@@ -47,10 +47,7 @@ return {
       },
       formatters = {
         prettier = {
-          -- prettier.requireConfig: only run if a config is found
-          condition = function(_, ctx)
-            return has_prettier_config(ctx.dirname)
-          end,
+          require_cwd = false,
         },
       },
       format_on_save = {
