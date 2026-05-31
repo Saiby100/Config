@@ -32,6 +32,7 @@ alias activate="source bin/activate"
 alias open='xdg-open $1 &>/dev/null'
 alias rn='mv $1 $2'
 alias cc='claude'
+alias lg='lazygit'
 
 # Configure Files
 alias zrc='nvim $HOME/.config/zsh/.zshrc'

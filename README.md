@@ -1,10 +1,82 @@
-# My-Config
+# Config
 
-## TODO
+Dotfiles managed via symlinks. Run `setup.sh` to link everything into place.
 
-- [ ] Replace the backup/restore copy flow in `script.sh` with symlinks so the repo and live config stay in sync automatically.
-  - `~/.config/nvim` → `~/Developer/Config/linux/nvim` (directory symlink)
-  - `~/.config/zsh` → `~/Developer/Config/linux/zsh` (directory symlink; add `.zsh_history`, `.zsh_sessions/`, `.zcompdump` to `.gitignore`)
-  - `~/.zshenv` → `~/Developer/Config/linux/.zshenv` (file symlink)
-  - `~/.claude/settings.json` and `~/.claude/statusline-command.sh` → per-file symlinks into `~/Developer/Config/linux/.claude/` (don't symlink the whole `~/.claude` directory — it contains session/history state that shouldn't be committed)
-  - Once symlinked, remove the relevant copy logic from `script.sh`; keep the Windows path as-is since symlinks don't translate cleanly.
+## Dependencies
+
+Install these before running the setup script.
+
+### macOS (Homebrew)
+
+```sh
+brew install neovim tmux lazygit ghostty
+brew install --cask font-jetbrains-mono-nerd-font
+```
+
+### Linux (apt)
+
+```sh
+sudo apt install neovim tmux zsh
+```
+
+- [Lazygit](https://github.com/jesseduffield/lazygit#installation) — install from GitHub releases or your distro's package manager
+- [Ghostty](https://ghostty.org/) — see official install instructions
+- [JetBrainsMono Nerd Font](https://www.nerdfonts.com/font-downloads) — used by Ghostty
+
+### Shared
+
+- [tpm](https://github.com/tmux-plugins/tpm) — tmux plugin manager:
+  ```sh
+  git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+  ```
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — CLI for Claude
+
+## Setup
+
+```sh
+git clone <repo-url> ~/Developer/Config
+cd ~/Developer/Config
+./setup.sh
+```
+
+This creates symlinks for:
+
+| Target | Symlink |
+|---|---|
+| `linux/.zshenv` | `~/.zshenv` |
+| `linux/.tmux.conf` | `~/.tmux.conf` |
+| `linux/.config/nvim` | `~/.config/nvim` |
+| `linux/.config/zsh` | `~/.config/zsh` |
+| `linux/.config/ghostty` | `~/.config/ghostty` |
+
+After linking, install tmux plugins with `prefix + I` inside tmux.
+
+## Structure
+
+```
+linux/
+  .zshenv                  # Points ZDOTDIR to ~/.config/zsh
+  .tmux.conf               # Tmux config (prefix: Ctrl+Space)
+  .claude/                 # Claude Code settings
+  .config/
+    ghostty/config         # Terminal (JetBrainsMono Nerd Font)
+    nvim/                  # Neovim (lazy.nvim, onedark, LSP, telescope)
+    zsh/
+      .zshrc               # Shell config (prompt, history, completions)
+      .zsh/aliasrc          # Aliases and shortcuts
+windows/
+  keybinds.ahk             # AutoHotKey remaps
+  nvim/                    # Windows-specific Neovim config
+  zsh/                     # Windows-specific Zsh config
+```
+
+## Key Aliases
+
+| Alias | Command |
+|---|---|
+| `lg` | `lazygit` |
+| `cc` | `claude` |
+| `ref` | Re-source `.zshrc` |
+| `zrc` | Edit `.zshrc` in nvim |
+| `zal` | Edit `aliasrc` in nvim |
+| `wp` | `cd ~/Developer` |
