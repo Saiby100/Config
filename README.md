@@ -9,27 +9,28 @@ Install these before running the setup script.
 ### macOS (Homebrew)
 
 ```sh
-brew install neovim tmux lazygit ghostty
+brew install neovim tmux lazygit ghostty ripgrep tree-sitter-cli
 brew install --cask font-jetbrains-mono-nerd-font
 ```
 
 ### Linux (apt)
 
 ```sh
-sudo apt install neovim tmux zsh
+sudo apt install neovim tmux zsh ripgrep
+# tree-sitter CLI: cargo install tree-sitter-cli (or npm install -g tree-sitter-cli)
 ```
 
 - [Lazygit](https://github.com/jesseduffield/lazygit#installation) — install from GitHub releases or your distro's package manager
 - [Ghostty](https://ghostty.org/) — see official install instructions
 - [JetBrainsMono Nerd Font](https://www.nerdfonts.com/font-downloads) — used by Ghostty
+- [ripgrep](https://github.com/BurntSushi/ripgrep) — required by Telescope's `find_files` and `live_grep`; without it the pickers return no results
+- [tree-sitter CLI](https://github.com/tree-sitter/tree-sitter) — nvim-treesitter's `main` branch compiles parsers with it; without it syntax highlighting silently fails
 
 ### Shared
 
-- [tpm](https://github.com/tmux-plugins/tpm) — tmux plugin manager:
-  ```sh
-  git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
-  ```
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) — CLI for Claude
+
+> tmux's plugin manager (tpm) is cloned and its plugins installed automatically by `setup.sh`.
 
 ## Setup
 
@@ -49,7 +50,9 @@ This creates symlinks for:
 | `.config/zsh` | `~/.config/zsh` |
 | `.config/ghostty` | `~/.config/ghostty` |
 
-After linking, install tmux plugins with `prefix + I` inside tmux.
+`setup.sh` also clones tpm, installs the tmux plugins, and reloads any running
+tmux server — so the config (including the theme and vim-tmux-navigator) takes
+effect without a manual `prefix + I` or server restart.
 
 ## Structure
 
