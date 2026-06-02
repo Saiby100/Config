@@ -11,7 +11,7 @@ return {
     { "<C-p>",     "<cmd>Telescope find_files<CR>", desc = "Find files" },
     -- <leader>f findInFiles
     { "<leader>f", "<cmd>Telescope live_grep<CR>",  desc = "Grep files" },
-    { "<leader>b", "<cmd>Telescope buffers<CR>",    desc = "Buffers" },
+    { "<leader>w", "<cmd>Telescope buffers<CR>",    desc = "Buffers" },
   },
   config = function()
     local telescope = require("telescope")
