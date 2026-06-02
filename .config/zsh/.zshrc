@@ -1,5 +1,5 @@
 if [ -z "$TMUX" ]; then
-  tmux new-session -A -s main
+  tmux new-session
 fi
 
 # Load in version control information

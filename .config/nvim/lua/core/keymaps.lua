@@ -45,12 +45,13 @@ map("n", "<leader>d", vim.lsp.buf.definition, opts)           -- revealDefinitio
 -- ------------------------------------------------------------------
 -- VS Code keybindings.json (non-vim) — ported to buffers/windows
 -- ------------------------------------------------------------------
--- alt+h/l : prev/next editor  →  prev/next buffer
+-- alt+h/l : prev/next editor  →  next/prev buffer
 map("n", "<A-l>", ":bnext<CR>", opts)
 map("n", "<A-h>", ":bprevious<CR>", opts)
 
--- ctrl+q : close active editor  →  delete buffer
-map("n", "<C-q>", ":bdelete<CR>", opts)
+-- <leader>q : close active editor  →  delete buffer
+-- (Ctrl+q is taken by tmux's kill-pane binding, so it never reaches Neovim.)
+map("n", "<leader>q", ":bdelete<CR>", opts)
 
 -- alt+j/k : scrollLineDown / scrollLineUp
 map({ "n", "v" }, "<A-j>", "<C-e>", opts)
@@ -66,3 +67,15 @@ map("n", "<A-S-l>", ":vertical resize +5<CR>", opts)
 
 -- Toggle tmux pane zoom
 map("n", "<leader>m", function() vim.fn.system("tmux resize-pane -Z") end, opts)
+
+-- ------------------------------------------------------------------
+-- Toggle comment with Ctrl+/ (VS Code editor.action.commentLine)
+-- Uses Neovim's built-in commenter (gcc/gc). Terminals send Ctrl+/ as
+-- 0x1f (<C-_>); newer Neovim also recognizes <C-/>, so bind both.
+-- ------------------------------------------------------------------
+local comment_opts = { remap = true, silent = true }
+for _, key in ipairs({ "<C-_>", "<C-/>" }) do
+	map("n", key, "gcc", comment_opts)               -- current line
+	map("x", key, "gc", comment_opts)                -- selection
+	map("i", key, "<Esc>gccA", comment_opts)         -- current line, stay in insert
+end

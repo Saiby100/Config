@@ -1,2 +1,7 @@
 font-family = JetBrainsMono Nerd Font
 theme = One Dark Two
+
+# Make the Option key send Alt so Neovim's <A-...> keybinds work.
+# `left` = left Option acts as Alt, right Option still types special chars
+# (é, ¬, …). Use `true` if you want both Option keys to act as Alt.
+macos-option-as-alt = left
