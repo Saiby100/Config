@@ -1,5 +1,9 @@
 font-family = JetBrainsMono Nerd Font
-theme = One Dark Two
+theme = One Double Dark
+
+# On launch, reattach to the most recent tmux session; only start a new
+# one if no session exists yet. `attach` targets the last-used session.
+command = /bin/zsh -lc "tmux attach || tmux new-session"
 
 # Make the Option key send Alt so Neovim's <A-...> keybinds work.
 # `left` = left Option acts as Alt, right Option still types special chars
