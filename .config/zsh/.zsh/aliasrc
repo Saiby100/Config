@@ -29,7 +29,6 @@ alias ref='source $HOME/.config/zsh/.zshrc'
 alias activate="source bin/activate"
 
 #
-alias open='xdg-open $1 &>/dev/null'
 alias rn='mv $1 $2'
 alias cc='claude'
 alias lg='lazygit'
