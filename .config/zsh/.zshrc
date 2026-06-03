@@ -57,41 +57,6 @@ function git_remote_status() {
   fi
 }
 
-# Run a Lowdefy app on a custom port, from inside its app folder.
-# Auth magic-links respect the chosen port (AUTH_TRUST_HOST makes NextAuth
-# use the request Host header instead of the fixed NEXTAUTH_URL).
-# Usage:  cd apps/prp-team && ldfport 8000
-function ldfport() {
-  local port=$1
-  if [[ -z $port ]]; then
-    echo "usage: ldfport <port>" >&2
-    return 1
-  fi
-
-  # Walk up from the current dir to find the app root (has lowdefy.yaml).
-  local dir=$PWD
-  while [[ $dir != / && ! -f $dir/lowdefy.yaml ]]; do
-    dir=${dir:h}
-  done
-  if [[ ! -f $dir/lowdefy.yaml ]]; then
-    echo "ldfport: no lowdefy.yaml found above $PWD" >&2
-    return 1
-  fi
-
-  # The Infisical secret path is hardcoded in the app's own package.json
-  # scripts (e.g. --path=/apps/taste), which may differ from the folder name.
-  local infpath=$(grep -oE -- '--path=[^ "]+' "$dir/package.json" 2>/dev/null | head -1 | sed 's/--path=//')
-  if [[ -z $infpath ]]; then
-    echo "ldfport: could not find an Infisical --path in $dir/package.json" >&2
-    return 1
-  fi
-
-  echo "▶ ${dir:t}  →  http://localhost:$port  (infisical $infpath)"
-  ( cd "$dir" && \
-    infisical run --env=dev --path="$infpath" -- \
-    env AUTH_TRUST_HOST=true pnpm exec lowdefy dev --port "$port" --no-open )
-}
-
 #Path Variables
 export PATH=$PATH:/home/saiby/.kotlinc/bin #Kotlin compiler
 export PATH=$PATH:/usr/local/gradle/gradle-8.3/bin #Gradle
@@ -105,3 +70,6 @@ source /usr/share/autojump/autojump.zsh 2>/dev/null
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# Machine-local overrides — keep this last so it can override anything above.
+[ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"
