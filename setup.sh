@@ -5,10 +5,18 @@ mkdir -p "$HOME/.config"
 
 ln -sf "$REPO_DIR/.zshenv" "$HOME/.zshenv"
 ln -sf "$REPO_DIR/.tmux.conf" "$HOME/.tmux.conf"
-for dir in nvim zsh ghostty; do
+for dir in nvim zsh ghostty lazygit; do
   rm -rf "$HOME/.config/$dir"
   ln -s "$REPO_DIR/.config/$dir" "$HOME/.config/$dir"
 done
+
+# macOS lazygit ignores ~/.config and reads from ~/Library/Application Support,
+# so point that path at the same tracked config (Linux uses the loop above).
+if [ "$(uname)" = "Darwin" ]; then
+  LG_MAC_DIR="$HOME/Library/Application Support/lazygit"
+  mkdir -p "$LG_MAC_DIR"
+  ln -sf "$REPO_DIR/.config/lazygit/config.yml" "$LG_MAC_DIR/config.yml"
+fi
 
 echo "Symlinks created."
 
@@ -24,6 +32,12 @@ fi
 # `tree-sitter-cli` no parsers compile and syntax highlighting silently fails.
 if command -v brew >/dev/null && ! command -v tree-sitter >/dev/null; then
   brew install tree-sitter-cli
+fi
+
+# Lazygit's config pipes diffs through `delta` for syntax-highlighted,
+# word-level review. Without it on PATH, lazygit falls back to raw diffs.
+if command -v brew >/dev/null && ! command -v delta >/dev/null; then
+  brew install git-delta
 fi
 
 # Install the tmux plugin manager (TPM) and the plugins declared in .tmux.conf.

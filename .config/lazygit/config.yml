@@ -1,0 +1,53 @@
+# Lazygit config — optimised for reviewing diffs and structuring commits.
+# Goal: maximise the diff panel, strip away noise, keep staging fast.
+
+gui:
+  # Give the diff (main) panel the most room. Side panels shrink, and the
+  # focused side panel expands on demand so file lists stay readable.
+  sidePanelWidth: 0.28
+  expandFocusedSidePanel: true
+  mainPanelSplitMode: flexible
+  # Hide the chatter. The command log and bottom donate/info line are the
+  # main sources of "unnecessary info" in the default layout.
+  showCommandLog: false
+  showBottomLine: false
+  showPanelJumps: true
+  # Flat file list (not a tree) so a multi-file change reads as one diff set.
+  showFileTree: false
+  # Show staged/unstaged icons so it's obvious what's going into the commit.
+  showNumstatInFilesView: true
+  # Reviewing-focused diff: a bit more surrounding context than the default 3.
+  nerdFontsVersion: "3"
+  scrollHeight: 4
+  # Theme — matches the pink/cyan prompt (#de9dac / #70e9ff).
+  theme:
+    activeBorderColor:
+      - "#70e9ff"
+      - bold
+    inactiveBorderColor:
+      - "#555568"
+    selectedLineBgColor:
+      - "#324a5e"
+    selectedRangeBgColor:
+      - "#324a5e"
+    optionsTextColor:
+      - "#70e9ff"
+    cherryPickedCommitBgColor:
+      - "#3a2a3a"
+    cherryPickedCommitFgColor:
+      - "#de9dac"
+    unstagedChangesColor:
+      - "#de9dac"
+git:
+  # Use delta for syntax-highlighted, word-level diffs inside lazygit.
+  pagers:
+    - colorArg: always
+      pager: delta --paging=never --line-numbers --hunk-header-style=omit
+  # More context around each hunk makes review (and splitting commits) easier.
+  diffContextSize: 5
+  # Sort files by status so newly-changed/staged items group together.
+  parseEmoji: false
+# Reviewing often means committing only part of the tree — make that fast.
+keybinding:
+  universal:
+    edit: "e" # open the file under the cursor in $EDITOR (nvim) to tweak before staging
