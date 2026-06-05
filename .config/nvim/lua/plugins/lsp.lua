@@ -135,7 +135,18 @@ return {
 					["<C-Space>"] = cmp.mapping.complete(),
 					["<C-e>"]     = cmp.mapping.abort(),
 					["<CR>"]      = cmp.mapping.confirm({ select = false }),
-					["<Tab>"]     = cmp.mapping.confirm({ select = true }),
+					-- Smart Tab: confirm the cmp menu if open, else accept a
+					-- Copilot ghost suggestion if one is showing, else plain tab.
+					["<Tab>"]     = cmp.mapping(function(fallback)
+						local ok, copilot = pcall(require, "copilot.suggestion")
+						if cmp.visible() then
+							cmp.confirm({ select = true })
+						elseif ok and copilot.is_visible() then
+							copilot.accept()
+						else
+							fallback()
+						end
+					end, { "i", "s" }),
 				}),
 				sources = cmp.config.sources({
 					{ name = "nvim_lsp" },
