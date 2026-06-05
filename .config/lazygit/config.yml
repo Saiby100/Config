@@ -12,8 +12,8 @@ gui:
   showCommandLog: false
   showBottomLine: false
   showPanelJumps: true
-  # Flat file list (not a tree) so a multi-file change reads as one diff set.
-  showFileTree: false
+  # File tree on by default (toggle with `). Tree view stays active on launch.
+  showFileTree: true
   # Show staged/unstaged icons so it's obvious what's going into the commit.
   showNumstatInFilesView: true
   # Reviewing-focused diff: a bit more surrounding context than the default 3.
