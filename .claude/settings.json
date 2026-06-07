@@ -40,8 +40,6 @@
       "Read(**/.env)",
       "Read(**/.env.*)",
       "Read(**/credentials*)",
-      "Cat(**/.env)",
-      "Cat(**/credentials*)",
       "Edit(**/.env)",
       "Edit(**/.env.*)",
       "Write(**/.env)",
