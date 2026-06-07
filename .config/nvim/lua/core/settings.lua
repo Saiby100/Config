@@ -17,4 +17,5 @@ vim.opt.incsearch = true
 vim.opt.hlsearch = true
 vim.opt.fixendofline = true       -- insertFinalNewline
 vim.opt.fillchars = { eob = ' ' }
+vim.opt.pumheight = 10            -- max items shown in completion popup; rest scroll
 vim.opt.autoread = true
