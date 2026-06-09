@@ -3,7 +3,9 @@ theme = One Double Dark
 
 # On launch, reattach to the most recent tmux session; only start a new
 # one if no session exists yet. `attach` targets the last-used session.
-command = /bin/zsh -lc "tmux attach || tmux new-session"
+# After tmux exits (detach or kill-session), drop into a plain login shell
+# so the ghostty window stays open instead of closing.
+command = /bin/zsh -lc "tmux attach || tmux new-session -s Workspace; exec /bin/zsh -l"
 
 # Make the Option key send Alt so Neovim's <A-...> keybinds work.
 # `left` = left Option acts as Alt, right Option still types special chars
