@@ -10,8 +10,8 @@ return {
     -- ctrl+p quickOpen
     { "<C-p>",     "<cmd>Telescope find_files<CR>", desc = "Find files" },
     -- <leader>f findInFiles
-    { "<leader>f", "<cmd>Telescope live_grep initial_mode=normal<CR>",  desc = "Grep files" },
-    { "<leader>w", "<cmd>Telescope buffers<CR>",    desc = "Buffers" },
+    { "<leader>f", "<cmd>Telescope live_grep<CR>",  desc = "Grep files" },
+    { "<leader>w", "<cmd>Telescope buffers initial_mode=normal<CR>",    desc = "Buffers" },
   },
   config = function()
     local telescope = require("telescope")
