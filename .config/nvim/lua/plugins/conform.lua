@@ -48,6 +48,14 @@ return {
       formatters = {
         prettier = {
           require_cwd = false,
+          -- prettier can't infer a parser from the .njk extension, so force
+          -- the yaml parser for *.yaml.njk files (filetype is yaml via
+          -- vim.filetype.add, so conform already routes them to prettier).
+          options = {
+            ext_parsers = {
+              njk = "yaml",
+            },
+          },
         },
       },
       format_on_save = {

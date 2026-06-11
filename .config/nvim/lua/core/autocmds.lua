@@ -34,3 +34,13 @@ vim.filetype.add({
     [".*%.html%.njk"] = "htmldjango",
   },
 })
+
+-- Nunjucks tags ({% ... %}) aren't valid YAML, so yamlls floods *.yaml.njk
+-- buffers with parse errors. Hide diagnostics there; completion/hover keep
+-- working since the server stays attached.
+vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile" }, {
+  pattern = "*.yaml.njk",
+  callback = function(ev)
+    vim.diagnostic.enable(false, { bufnr = ev.buf })
+  end,
+})

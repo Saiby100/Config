@@ -36,6 +36,10 @@ return {
         },
       },
       pickers = {
+        -- Sort buffers by most recently used so the last opened is on top.
+        buffers = {
+          sort_mru = true,
+        },
         -- rg/fd respect .gitignore by default, so gitignored files like .env
         -- never show up (`hidden = true` only adds non-ignored dotfiles). A
         -- positive rg glob can't be added to whitelist them: it acts as a
