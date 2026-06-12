@@ -51,7 +51,30 @@ map("n", "<A-h>", ":bprevious<CR>", opts)
 
 -- <leader>q : close active editor  →  delete buffer
 -- (Ctrl+q is taken by tmux's kill-pane binding, so it never reaches Neovim.)
-map("n", "<leader>q", ":bdelete<CR>", opts)
+-- Switch the window to another buffer *before* deleting, so focus never lands
+-- in NvimTree. Otherwise deleting the last editor buffer leaves NvimTree as the
+-- only window, which trips the auto-quit autocmd in nvim-tree.lua and closes
+-- all of Neovim.
+local function close_buffer()
+	local cur = vim.api.nvim_get_current_buf()
+	local alt = vim.fn.bufnr("#")
+	if alt ~= -1 and alt ~= cur and vim.fn.buflisted(alt) == 1 then
+		vim.cmd("buffer #")
+	else
+		vim.cmd("bprevious")
+	end
+	-- Still on the buffer we're deleting → it was the only one; show the Alpha
+	-- dashboard so the window survives with the home page instead of a blank buffer.
+	local last_buffer = vim.api.nvim_get_current_buf() == cur
+	if last_buffer then
+		vim.cmd("enew")
+	end
+	vim.cmd("bdelete " .. cur)
+	if last_buffer then
+		require("alpha").start(false)
+	end
+end
+map("n", "<leader>q", close_buffer, opts)
 
 -- alt+j/k : scrollLineDown / scrollLineUp
 map({ "n", "v" }, "<A-j>", "<C-e>", opts)
