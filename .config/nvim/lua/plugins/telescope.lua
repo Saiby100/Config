@@ -39,6 +39,12 @@ return {
         -- Sort buffers by most recently used so the last opened is on top.
         buffers = {
           sort_mru = true,
+          -- Telescope ships actions.delete_buffer but binds nothing to it, so
+          -- wire dd (normal) / <C-d> (insert) to close the highlighted buffer.
+          mappings = {
+            n = { ["dd"] = actions.delete_buffer },
+            i = { ["<C-d>"] = actions.delete_buffer },
+          },
         },
         -- rg/fd respect .gitignore by default, so gitignored files like .env
         -- never show up (`hidden = true` only adds non-ignored dotfiles). A
