@@ -23,7 +23,13 @@ PROMPT=' %B%F{#de9dac}%~%b
 #zstyle ':vcs_info:git:*' actionformats '%b|%a%u%c'
 
 # Custom Variables
-EDITOR=vim
+export EDITOR=vim
+
+# Vi keybindings on the command line. Set explicitly instead of relying on
+# zsh's auto-detection from $EDITOR (which only triggers if EDITOR contains
+# "vi" and is exported before ZLE initializes — too fragile).
+bindkey -v
+KEYTIMEOUT=1                       # ~10ms after Esc, so mode switch feels instant
 
 # History in cache directory:
 HISTSIZE=10000
