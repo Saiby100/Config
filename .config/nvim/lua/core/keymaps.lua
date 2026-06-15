@@ -92,6 +92,46 @@ map("n", "<A-S-l>", ":vertical resize +5<CR>", opts)
 map("n", "<leader>m", function() vim.fn.system("tmux resize-pane -Z") end, opts)
 
 -- ------------------------------------------------------------------
+-- Y : copy a Claude-friendly file reference to the system clipboard
+--   normal mode → @~/abs/path            (e.g. @~/Developer/Config/.../keymaps.lua)
+--   visual mode → ~/abs/path + line range (e.g. ~/Developer/Config/.../keymaps.lua:94-110)
+-- The path is the absolute path with $HOME collapsed to '~' (the :~ modifier).
+-- '~' is expanded by Claude's file reader, so the reference resolves from ANY
+-- cwd/added directory — unlike a cwd-relative path — while leaking no username
+-- and staying portable. The normal-mode '@' is Claude Code's file-mention
+-- syntax: it attaches the whole file to context up front, no Read round-trip.
+-- The visual-mode form drops '@' on purpose — '@' can't scope to a line range,
+-- so a bare path:start-end lets Claude read exactly the highlighted lines.
+-- Overrides the default normal-mode Y (synonym for yy).
+-- ------------------------------------------------------------------
+local function yank_file_ref(with_range)
+	local path = vim.fn.fnamemodify(vim.fn.expand("%:p"), ":~")
+	if path == "" then
+		vim.notify("No file path for this buffer", vim.log.levels.WARN)
+		return
+	end
+	local ref
+	if with_range then
+		-- line("v") = visual anchor, line(".") = cursor; read while still in
+		-- visual mode (marks '<'> aren't set until the selection is left).
+		local a, b = vim.fn.line("v"), vim.fn.line(".")
+		if a > b then a, b = b, a end
+		ref = string.format("%s:%d-%d", path, a, b)
+	else
+		ref = "@" .. path
+	end
+	vim.fn.setreg("+", ref)
+	vim.notify("Copied " .. ref)
+end
+
+map("n", "Y", function() yank_file_ref(false) end, opts)
+map("x", "Y", function()
+	yank_file_ref(true)
+	-- leave visual mode, matching the feel of a normal yank
+	vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "n", false)
+end, opts)
+
+-- ------------------------------------------------------------------
 -- Toggle comment with Ctrl+/ (VS Code editor.action.commentLine)
 -- Uses Neovim's built-in commenter (gcc/gc). Terminals send Ctrl+/ as
 -- 0x1f (<C-_>); newer Neovim also recognizes <C-/>, so bind both.
