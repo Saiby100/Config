@@ -93,15 +93,15 @@ map("n", "<leader>m", function() vim.fn.system("tmux resize-pane -Z") end, opts)
 
 -- ------------------------------------------------------------------
 -- Y : copy a Claude-friendly file reference to the system clipboard
---   normal mode → @~/abs/path            (e.g. @~/Developer/Config/.../keymaps.lua)
---   visual mode → ~/abs/path + line range (e.g. ~/Developer/Config/.../keymaps.lua:94-110)
+--   normal mode → @~/abs/path              (e.g. @~/Developer/Config/.../keymaps.lua)
+--   visual mode → @~/abs/path L<start>-<end> (e.g. @~/Developer/Config/.../keymaps.lua L94-110)
 -- The path is the absolute path with $HOME collapsed to '~' (the :~ modifier).
 -- '~' is expanded by Claude's file reader, so the reference resolves from ANY
 -- cwd/added directory — unlike a cwd-relative path — while leaking no username
--- and staying portable. The normal-mode '@' is Claude Code's file-mention
--- syntax: it attaches the whole file to context up front, no Read round-trip.
--- The visual-mode form drops '@' on purpose — '@' can't scope to a line range,
--- so a bare path:start-end lets Claude read exactly the highlighted lines.
+-- and staying portable. The '@' is Claude Code's file-mention syntax: it
+-- attaches the file to context up front, no Read round-trip. A space-separated
+-- 'L<start>-<end>' suffix scopes the mention to the highlighted lines while
+-- keeping the auto-attach, so both forms get the '@' prefix.
 -- Overrides the default normal-mode Y (synonym for yy).
 -- ------------------------------------------------------------------
 local function yank_file_ref(with_range)
@@ -116,7 +116,7 @@ local function yank_file_ref(with_range)
 		-- visual mode (marks '<'> aren't set until the selection is left).
 		local a, b = vim.fn.line("v"), vim.fn.line(".")
 		if a > b then a, b = b, a end
-		ref = string.format("%s:%d-%d", path, a, b)
+		ref = string.format("@%s L%d-%d", path, a, b)
 	else
 		ref = "@" .. path
 	end
