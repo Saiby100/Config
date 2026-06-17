@@ -5,6 +5,11 @@ mkdir -p "$HOME/.config"
 
 ln -sf "$REPO_DIR/.zshenv" "$HOME/.zshenv"
 ln -sf "$REPO_DIR/.tmux.conf" "$HOME/.tmux.conf"
+
+# Claude Code writes into ~/.claude (caches, backups, settings it mutates), so
+# only link the statusline script — settings.json is left as a live file.
+mkdir -p "$HOME/.claude"
+ln -sf "$REPO_DIR/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 for dir in nvim zsh ghostty lazygit; do
   rm -rf "$HOME/.config/$dir"
   ln -s "$REPO_DIR/.config/$dir" "$HOME/.config/$dir"
