@@ -132,6 +132,76 @@ map("x", "Y", function()
 end, opts)
 
 -- ------------------------------------------------------------------
+-- <leader>gg : toggle lazygit in a floating terminal
+-- Runs lazygit *inside* this Neovim session (the long-lived host) instead of
+-- the other way around, so the editor session is never lost. Hiding the window
+-- (rather than killing the buffer) keeps the lazygit process running, so
+-- reopening lands on the exact same state. When lazygit is launched from here,
+-- Neovim sets $NVIM, which lazygit auto-detects to route its `e` (edit) command
+-- through `nvim --server $NVIM --remote` — files open as buffers in THIS
+-- session, not a nested nvim. (The shell `lg` alias still works standalone.)
+-- ------------------------------------------------------------------
+local lazygit = { buf = -1, win = -1 }
+
+local function lazygit_float(buf)
+	local w = math.floor(vim.o.columns * 0.9)
+	local h = math.floor(vim.o.lines * 0.9)
+	return vim.api.nvim_open_win(buf, true, {
+		relative = "editor",
+		width = w,
+		height = h,
+		col = math.floor((vim.o.columns - w) / 2),
+		row = math.floor((vim.o.lines - h) / 2),
+		style = "minimal",
+		border = "rounded",
+	})
+end
+
+local function toggle_lazygit()
+	if vim.api.nvim_win_is_valid(lazygit.win) then
+		vim.api.nvim_win_hide(lazygit.win) -- hide, keep lazygit running
+		lazygit.win = -1
+		return
+	end
+	if vim.api.nvim_buf_is_valid(lazygit.buf) then
+		lazygit.win = lazygit_float(lazygit.buf) -- reopen existing session
+	else
+		lazygit.buf = vim.api.nvim_create_buf(false, true)
+		lazygit.win = lazygit_float(lazygit.buf)
+		vim.fn.jobstart("lazygit", {
+			term = true,
+			on_exit = function()
+				if vim.api.nvim_buf_is_valid(lazygit.buf) then
+					vim.api.nvim_buf_delete(lazygit.buf, { force = true })
+				end
+				lazygit.buf, lazygit.win = -1, -1
+			end,
+		})
+		-- Re-enter terminal mode whenever focus lands on the lazygit buffer, so
+		-- every key (incl. j/k) is sent to lazygit instead of moving Neovim's
+		-- cursor in terminal-normal mode. Scoped to this buffer only.
+		vim.api.nvim_create_autocmd({ "BufEnter", "WinEnter" }, {
+			buffer = lazygit.buf,
+			callback = function()
+				if vim.api.nvim_get_current_buf() == lazygit.buf then
+					vim.cmd("startinsert")
+				end
+			end,
+		})
+	end
+	-- Schedule the initial enter: on first open the terminal isn't attached yet
+	-- in this tick, so startinsert would no-op without the defer.
+	vim.schedule(function()
+		if vim.api.nvim_win_is_valid(lazygit.win) then
+			vim.api.nvim_set_current_win(lazygit.win)
+			vim.cmd("startinsert")
+		end
+	end)
+end
+
+map("n", "<leader>gg", toggle_lazygit, { desc = "Toggle lazygit" })
+
+-- ------------------------------------------------------------------
 -- Toggle comment with Ctrl+/ (VS Code editor.action.commentLine)
 -- Uses Neovim's built-in commenter (gcc/gc). Terminals send Ctrl+/ as
 -- 0x1f (<C-_>); newer Neovim also recognizes <C-/>, so bind both.

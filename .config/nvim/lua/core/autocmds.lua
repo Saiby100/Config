@@ -14,11 +14,10 @@ vim.api.nvim_create_autocmd("BufWritePre", {
   end,
 })
 
--- Exit terminal mode with jj or <Esc><Esc> (mirrors insert-mode jj)
+-- Exit terminal mode with <Esc><Esc>
 vim.api.nvim_create_autocmd("TermOpen", {
   callback = function(ev)
     local opts = { buffer = ev.buf, silent = true }
-    vim.keymap.set("t", "jj", [[<C-\><C-n>]], opts)
     vim.keymap.set("t", "<Esc><Esc>", [[<C-\><C-n>]], opts)
   end,
 })
