@@ -188,6 +188,13 @@ local function toggle_lazygit()
 				end
 			end,
 		})
+		-- lazygit uses <Esc> to close popups/inputs, so drop the shell-terminal
+		-- <Esc><Esc> escape map (set in autocmds.lua's TermOpen) for this buffer
+		-- — otherwise Esc gets swallowed/exits terminal mode instead. Deferred
+		-- so it runs after TermOpen has installed the map.
+		vim.schedule(function()
+			pcall(vim.keymap.del, "t", "<Esc><Esc>", { buffer = lazygit.buf })
+		end)
 	end
 	-- Schedule the initial enter: on first open the terminal isn't attached yet
 	-- in this tick, so startinsert would no-op without the defer.
