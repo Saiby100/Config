@@ -16,6 +16,29 @@ return {
   config = function()
     local telescope = require("telescope")
     local actions = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
+
+    -- Open the highlighted entry in the window Telescope was launched from,
+    -- but keep the picker open and focused so you can open several files in
+    -- one session (press <C-o> on a few entries, then <Esc> to close).
+    local function open_keep_open(prompt_bufnr)
+      local picker = action_state.get_current_picker(prompt_bufnr)
+      local entry = action_state.get_selected_entry()
+      if not entry then
+        return
+      end
+      local filename = entry.path or entry.filename
+      if not filename then
+        return
+      end
+      -- Run :edit in the launch window without moving focus there. Switching
+      -- focus out of the prompt makes Telescope auto-close itself, so instead
+      -- nvim_win_call runs the edit with that window current and restores
+      -- focus to the prompt afterward, keeping the picker open.
+      vim.api.nvim_win_call(picker.original_win_id, function()
+        vim.cmd("edit " .. vim.fn.fnameescape(filename))
+      end)
+    end
 
     telescope.setup({
       defaults = {
@@ -27,6 +50,12 @@ return {
           i = {
             ["<C-j>"] = actions.move_selection_next,
             ["<C-k>"] = actions.move_selection_previous,
+            -- Open file without closing the picker.
+            ["<C-o>"] = open_keep_open,
+          },
+          n = {
+            -- Open file without closing the picker.
+            ["<C-o>"] = open_keep_open,
           },
         },
         file_ignore_patterns = { "node_modules", "dist/", "%.git/" },
