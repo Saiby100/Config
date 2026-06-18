@@ -51,14 +51,17 @@ _comp_options+=(globdots)               # Include hidden files.
 
 function git_remote_status() {
   if [[ $(git rev-parse --is-inside-work-tree 2>/dev/null) == "true" ]]; then
+    local branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
     local remote=$(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null)
     if [[ -n $remote ]]; then
       local tracking=$(git rev-parse --symbolic-full-name --abbrev-ref @{u} 2>/dev/null)
       if [[ $tracking == $remote ]]; then
-        echo "%F{#70e9ff}$(git rev-parse --abbrev-ref HEAD)⎇ %f"  # Up to date
+        echo "%F{#70e9ff}$branch⎇ %f"  # Up to date
       else
-        echo "%F{red}$(git rev-parse --abbrev-ref HEAD)⎇ %f"  # Not up to date
+        echo "%F{red}$branch⎇ %f"  # Not up to date
       fi
+    elif [[ -n $branch ]]; then
+      echo "%F{yellow}$branch⎇ %f"  # Local only — no upstream yet
     fi
   fi
 }
