@@ -47,6 +47,34 @@ git:
   diffContextSize: 5
   # Sort files by status so newly-changed/staged items group together.
   parseEmoji: false
+os:
+  # Open files in the HOST nvim when lazygit runs inside it ($NVIM set), and fall
+  # back to a fresh nvim when run standalone (`lg` alias, $NVIM unset).
+  #
+  # We can't use the stock `nvim-remote` preset (plain `--remote`): lazygit lives
+  # in a floating window, which is nvim's *current* window when the edit RPC
+  # arrives, so `--remote` drops the file into that minimal-style float — a
+  # cramped overlay that never joins the normal layout or the buffer list.
+  #
+  # So we still let `--remote` open the file (it handles {{filename}} quoting and
+  # paths with spaces), then fire a *separate, argument-free* `--remote-expr` that
+  # calls a host-side Lua helper (in nvim/lua/core/keymaps.lua). The helper finds
+  # the file the float just swapped to, restores lazygit in the float and hides
+  # it, then shows that file in a real window — so it opens like any other buffer
+  # and joins the buffer list (telescope, :ls). Passing the filename *into* the
+  # expr is avoided on purpose: lazygit double-quotes it and the shell would strip
+  # those quotes, leaving an unquoted (invalid) Vimscript expression. {{line}} is
+  # a bare number, so it's safe to pass. Output (v:null) is discarded.
+  #
+  # editPreset pins `suspend: false`: the suspend flag comes from the PRESET, not
+  # the command template, even though we override the templates below. Without it
+  # lazygit guesses the `nvim` preset from $EDITOR and suspends — taking over the
+  # terminal to echo `+ /bin/zsh -c …` and hanging — instead of firing the remote
+  # call in the background.
+  editPreset: "nvim-remote"
+  edit: '[ -z "$NVIM" ] && nvim -- {{filename}} || { nvim --server "$NVIM" --remote {{filename}}; nvim --server "$NVIM" --remote-expr "v:lua._lazygit_fixup()" >/dev/null; }'
+  editAtLine: '[ -z "$NVIM" ] && nvim +{{line}} -- {{filename}} || { nvim --server "$NVIM" --remote {{filename}}; nvim --server "$NVIM" --remote-expr "v:lua._lazygit_fixup({{line}})" >/dev/null; }'
+  openDirInEditor: '[ -z "$NVIM" ] && nvim -- {{dir}} || { nvim --server "$NVIM" --remote {{dir}}; nvim --server "$NVIM" --remote-expr "v:lua._lazygit_fixup()" >/dev/null; }'
 # Reviewing often means committing only part of the tree — make that fast.
 keybinding:
   universal:

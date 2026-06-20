@@ -137,25 +137,45 @@ end, opts)
 -- the other way around, so the editor session is never lost. Hiding the window
 -- (rather than killing the buffer) keeps the lazygit process running, so
 -- reopening lands on the exact same state. When lazygit is launched from here,
--- Neovim sets $NVIM, which lazygit auto-detects to route its `e` (edit) command
--- through `nvim --server $NVIM --remote` — files open as buffers in THIS
--- session, not a nested nvim. (The shell `lg` alias still works standalone.)
+-- Neovim sets $NVIM; the lazygit config pins `os.editPreset: nvim-remote`, which
+-- routes its `e` (edit) command through `nvim --server $NVIM --remote` — files
+-- open as buffers in THIS session, not a nested nvim. (Pinning is required: left
+-- to auto-detect, lazygit picks the plain `nvim` preset from $EDITOR and nests.
+-- The preset's built-in fallback keeps the shell `lg` alias working standalone.)
 -- ------------------------------------------------------------------
 local lazygit = { buf = -1, win = -1 }
 
-local function lazygit_float(buf)
+-- Geometry for the float, recomputed from the *current* editor size. Shared by
+-- the initial open and the VimResized handler so the two never drift.
+local function lazygit_geometry()
 	local w = math.floor(vim.o.columns * 0.9)
 	local h = math.floor(vim.o.lines * 0.9)
-	return vim.api.nvim_open_win(buf, true, {
+	return {
 		relative = "editor",
 		width = w,
 		height = h,
 		col = math.floor((vim.o.columns - w) / 2),
 		row = math.floor((vim.o.lines - h) / 2),
-		style = "minimal",
-		border = "rounded",
-	})
+	}
 end
+
+local function lazygit_float(buf)
+	local cfg = lazygit_geometry()
+	cfg.style = "minimal"
+	cfg.border = "rounded"
+	return vim.api.nvim_open_win(buf, true, cfg)
+end
+
+-- Resize the float to match the editor whenever the host is resized (e.g.
+-- resizing the tmux/terminal pane fires VimResized). Without this the float
+-- keeps the dimensions it was opened with and stays small after a grow.
+vim.api.nvim_create_autocmd("VimResized", {
+	callback = function()
+		if vim.api.nvim_win_is_valid(lazygit.win) then
+			vim.api.nvim_win_set_config(lazygit.win, lazygit_geometry())
+		end
+	end,
+})
 
 local function toggle_lazygit()
 	if vim.api.nvim_win_is_valid(lazygit.win) then
@@ -171,6 +191,13 @@ local function toggle_lazygit()
 		vim.fn.jobstart("lazygit", {
 			term = true,
 			on_exit = function()
+				-- Close the float *before* deleting its buffer. Deleting the
+				-- buffer alone doesn't reliably tear down the window — Neovim
+				-- often swaps in a fresh empty buffer to keep the window alive,
+				-- leaving a blank float hovering over the editor.
+				if vim.api.nvim_win_is_valid(lazygit.win) then
+					vim.api.nvim_win_close(lazygit.win, true)
+				end
 				if vim.api.nvim_buf_is_valid(lazygit.buf) then
 					vim.api.nvim_buf_delete(lazygit.buf, { force = true })
 				end
@@ -207,6 +234,38 @@ local function toggle_lazygit()
 end
 
 map("n", "<leader>gg", toggle_lazygit, { desc = "Toggle lazygit" })
+
+-- ------------------------------------------------------------------
+-- Fixup for lazygit's `e` (see lazygit/config.yml). lazygit runs in the float,
+-- so the float is nvim's *current* window when its `--remote {{filename}}` edit
+-- arrives — the file gets dropped into the cramped, minimal-style float instead
+-- of the editor. lazygit then calls this via `--remote-expr`: the float now
+-- shows the just-opened file, so we grab that buffer, restore the lazygit
+-- terminal into the float and hide it (keeping lazygit running, ready to
+-- reopen), then show the file in whatever real window we land on — so it opens
+-- like a normal buffer and joins the buffer list (telescope, :ls, etc.).
+-- Scheduled so the window work runs outside the --remote-expr eval context.
+-- ------------------------------------------------------------------
+function _G._lazygit_fixup(line)
+	vim.schedule(function()
+		local win = lazygit.win
+		if not vim.api.nvim_win_is_valid(win) then
+			return
+		end
+		local file_buf = vim.api.nvim_win_get_buf(win)
+		-- The float swapped to the file buffer; put the lazygit terminal back so
+		-- reopening the float lands on lazygit, not this file.
+		if vim.api.nvim_buf_is_valid(lazygit.buf) then
+			vim.api.nvim_win_set_buf(win, lazygit.buf)
+		end
+		vim.api.nvim_win_hide(win) -- hide, keep lazygit running
+		lazygit.win = -1
+		vim.api.nvim_set_current_buf(file_buf) -- show the file in a real window
+		if line and line > 0 then
+			pcall(vim.api.nvim_win_set_cursor, 0, { line, 0 })
+		end
+	end)
+end
 
 -- ------------------------------------------------------------------
 -- Toggle comment with Ctrl+/ (VS Code editor.action.commentLine)
