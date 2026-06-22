@@ -222,6 +222,20 @@ local function toggle_lazygit()
 		vim.schedule(function()
 			pcall(vim.keymap.del, "t", "<Esc><Esc>", { buffer = lazygit.buf })
 		end)
+		-- Restore tmux pane navigation from inside the float. The buffer sits in
+		-- terminal-insert mode (above), where the global normal-mode
+		-- <C-h/j/k/l> → TmuxNavigate maps don't apply — so the keys would
+		-- otherwise be swallowed by lazygit. The float is fullscreen with no
+		-- nvim splits to move between, so switch the tmux pane directly rather
+		-- than via TmuxNavigate (whose wincmd logic would drop focus into the
+		-- editor behind the float). No-op when nvim runs outside tmux.
+		for key, dir in pairs({ ["<C-h>"] = "L", ["<C-j>"] = "D", ["<C-k>"] = "U", ["<C-l>"] = "R" }) do
+			vim.keymap.set("t", key, function()
+				if vim.env.TMUX then
+					vim.fn.system("tmux select-pane -" .. dir)
+				end
+			end, { buffer = lazygit.buf, desc = "Navigate tmux pane " .. dir })
+		end
 	end
 	-- Schedule the initial enter: on first open the terminal isn't attached yet
 	-- in this tick, so startinsert would no-op without the defer.
