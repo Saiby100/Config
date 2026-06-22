@@ -26,7 +26,6 @@ alias la='ls -a'
 alias py='python3'
 alias update='sudo apt update && sudo apt-get upgrade'
 alias ref='source $HOME/.config/zsh/.zshrc'
-alias activate="source bin/activate"
 
 #
 alias rn='mv $1 $2'
@@ -38,7 +37,6 @@ alias zrc='nvim $HOME/.config/zsh/.zshrc'
 alias zal='nvim $HOME/.config/zsh/.zsh/aliasrc'
 
 # Change directory shortcuts
-alias win10='virt-viewer --connect=qemu:///system --domain-name win10'
 alias wp='cd ~/Developer'
 
 export EDITOR=nvim
