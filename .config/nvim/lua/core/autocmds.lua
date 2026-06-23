@@ -14,6 +14,13 @@ vim.api.nvim_create_autocmd("BufWritePre", {
   end,
 })
 
+-- Re-equalize splits when the outer window resizes (e.g. resizing a tmux
+-- pane). Neovim absorbs the size change into one split instead of scaling
+-- them proportionally, so splits look "stuck" without this.
+vim.api.nvim_create_autocmd("VimResized", {
+  command = "tabdo wincmd =",
+})
+
 -- Exit terminal mode with <Esc><Esc>
 vim.api.nvim_create_autocmd("TermOpen", {
   callback = function(ev)
