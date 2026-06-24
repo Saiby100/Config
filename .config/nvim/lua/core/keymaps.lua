@@ -21,8 +21,11 @@ map("i", "<C-j>", "<Down>", opts)
 -- Split screen
 map("n", "<leader>S", ":vsp<CR>", opts)
 
--- Prevent pasted-over text from replacing the register (vim.visualModeKeyBindings p→P)
-map("x", "p", '"_dP', opts)
+-- Prevent pasted-over text from replacing the register.
+-- In Neovim, visual-mode P pastes over the selection without clobbering the
+-- register. (The old "_dP trick broke at end-of-line: deleting the selection
+-- moved the cursor onto the previous char, so P pasted in the wrong place.)
+map("x", "p", "P", opts)
 
 -- ------------------------------------------------------------------
 -- VS Code vim insertModeKeyBindings
