@@ -7,7 +7,6 @@ input=$(cat)
 cwd_full=$(echo "$input" | jq -r '.workspace.current_dir')
 cwd=$(echo "$cwd_full" | sed "s|^$HOME|~|")
 model=$(echo "$input" | jq -r '.model.display_name')
-transcript=$(echo "$input" | jq -r '.transcript_path // empty')
 cost=$(echo "$input" | jq -r '.cost.total_cost_usd // 0')
 vim_mode=$(echo "$input" | jq -r '.vim.mode // empty')
 
@@ -18,14 +17,15 @@ if cd "$cwd_full" 2>/dev/null && git rev-parse --git-dir > /dev/null 2>&1; then
   git_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 fi
 
-# --- Context indicator (from latest assistant usage) -----------------------
+# --- Context indicator (from Claude Code's own context_window field) --------
+# The window size comes from the session, so this tracks whatever model is
+# active instead of assuming a fixed ceiling.
 ctx_seg=""
-if [ -n "$transcript" ] && [ -f "$transcript" ]; then
-  ctx_tokens=$(grep '"usage"' "$transcript" 2>/dev/null | tail -1 | \
-    jq -r '(.message.usage // .usage) | ((.input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.cache_read_input_tokens // 0))' 2>/dev/null)
-  if [ -n "$ctx_tokens" ] && [ "$ctx_tokens" -gt 0 ] 2>/dev/null; then
-    window=200000
-    pct=$(( ctx_tokens * 100 / window ))
+ctx=$(echo "$input" | jq -r '[.context_window.total_input_tokens // 0, .context_window.used_percentage // -1] | @tsv')
+if [ -n "$ctx" ]; then
+  IFS=$'\t' read -r ctx_tokens pct <<< "$ctx"
+  pct=${pct%.*}
+  if [ "$ctx_tokens" -gt 0 ] 2>/dev/null && [ "$pct" -ge 0 ] 2>/dev/null; then
     [ "$pct" -gt 100 ] && pct=100
     # color by fill level (OneDark Pro: green -> yellow -> red)
     if   [ "$pct" -lt 50 ]; then ccol="152;195;121"   # green  #98c379
