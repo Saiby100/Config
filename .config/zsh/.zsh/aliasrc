@@ -24,7 +24,6 @@ ex ()
 alias ll='ls -lah'
 alias la='ls -a'
 alias py='python3'
-alias update='sudo apt update && sudo apt-get upgrade'
 alias ref='source $HOME/.config/zsh/.zshrc'
 
 #
