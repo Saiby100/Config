@@ -1,6 +1,17 @@
 # Lazygit config — optimised for reviewing diffs and structuring commits.
 # Goal: maximise the diff panel, strip away noise, keep staging fast.
 
+# Quit lazygit when <Esc> is pressed at a top-level panel (it still closes
+# popups/menus/search inputs first, as usual). Quitting fires the float's
+# on_exit handler (nvim/lua/core/keymaps.lua), which tears down the floating
+# window — so a final <Esc> closes the lazygit window inside Neovim.
+quitOnTopLevelReturn: true
+
+# When launched outside a git repo (e.g. <leader>gg from a non-repo buffer),
+# skip the "create a new repo?" prompt and open the most recent repo instead
+# (tracked in lazygit's state.yml).
+notARepository: skip
+
 gui:
   # Give the diff (main) panel the most room. Side panels shrink, and the
   # focused side panel expands on demand so file lists stay readable.

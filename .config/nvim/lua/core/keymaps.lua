@@ -180,6 +180,34 @@ vim.api.nvim_create_autocmd("VimResized", {
 	end,
 })
 
+-- Directory to launch lazygit in. Normally nil (inherit nvim's cwd), but when
+-- the cwd isn't inside a git repo, fall back to the most recent repo from
+-- lazygit's own state file. Launching *inside* a repo matters: started outside
+-- one, lazygit either prompts (notARepository: prompt) or — even with `skip` —
+-- cds to the recent repo but force-opens the recent-repos menu on top
+-- (hardcoded in its app setup; no config to disable it).
+local function lazygit_cwd()
+	if vim.fs.root(vim.fn.getcwd(), ".git") then
+		return nil
+	end
+	local state = vim.fn.expand("~/Library/Application Support/lazygit/state.yml")
+	local in_recents = false
+	for _, line in ipairs(vim.fn.filereadable(state) == 1 and vim.fn.readfile(state) or {}) do
+		if in_recents then
+			local repo = line:match("^%s*-%s*(.-)%s*$")
+			if not repo then
+				break -- past the recentrepos list
+			end
+			if vim.fn.isdirectory(repo .. "/.git") == 1 or vim.fn.filereadable(repo .. "/.git") == 1 then
+				return repo
+			end
+		elseif line:match("^recentrepos:") then
+			in_recents = true
+		end
+	end
+	return nil -- no usable recent repo; let lazygit handle it
+end
+
 local function toggle_lazygit()
 	if vim.api.nvim_win_is_valid(lazygit.win) then
 		vim.api.nvim_win_hide(lazygit.win) -- hide, keep lazygit running
@@ -193,6 +221,7 @@ local function toggle_lazygit()
 		lazygit.win = lazygit_float(lazygit.buf)
 		vim.fn.jobstart("lazygit", {
 			term = true,
+			cwd = lazygit_cwd(),
 			on_exit = function()
 				-- Close the float *before* deleting its buffer. Deleting the
 				-- buffer alone doesn't reliably tear down the window — Neovim
