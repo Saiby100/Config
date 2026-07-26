@@ -1,218 +1,186 @@
--- Session-scoped search filters shared by the file/grep pickers. Set via the
--- <leader>s map below; they live for the whole Neovim session and every
--- find_files / live_grep launch honours them until changed or cleared. The
--- active scope is surfaced in each picker's title bar, so it stays visible while
--- Telescope is open. scope.glob is a list of patterns (or nil) — multiple
--- positive rg globs OR together, so several file types can be active at once.
-local scope = { dir = nil, glob = nil }
+-- Inline search scoping for the Telescope file & grep pickers.
+--
+-- Both <C-p> (find files) and <leader>f (live grep) take the directory /
+-- file-type scope in the SAME prompt as the query, split on " :: ":
+--
+--   src *.ts :: Button     -> dir "src", type *.ts, searching "Button"
+--   *.md :: TODO           -> all *.md files, searching "TODO"
+--   Button                 -> no scope, searching "Button"
+--
+-- The scope half is remembered for the rest of the Neovim session: each picker
+-- opens pre-filled with "<last scope> :: " and the cursor after it, so you keep
+-- the scope by just typing your query, or edit/clear it inline. A fresh Neovim
+-- resets it. The prompt is authoritative — whatever scope you leave in it when
+-- you close is what the next launch pre-fills.
+--
+-- Scope grammar (whitespace-separated tokens, left of " :: "):
+--   * the LEADING tokens with no glob metachar (* ? [) are search directories;
+--     the first token that HAS a metachar starts the file-type globs, and every
+--     token from there on is a glob — so "dirs come first, then types"
+--   * multiple dirs become multiple rg search roots (all searched together);
+--     multiple globs OR together (rg --glob), so several types are active at once
+--   * with no leading dir the whole project is searched; with no glob all types
+--     match. Paths may be absolute, ~/… or ../… — rg searches each as a root.
+--
+-- e.g.  src lib :: TODO          -> dirs src + lib, all types, searching "TODO"
+--       src *.ts *.tsx :: Button -> dir src, only *.ts/*.tsx, searching "Button"
+--       *.md :: draft            -> all *.md anywhere, searching "draft"
+--
+-- " :: " is the separator (not "|") because "|" is rg's regex alternation, so a
+-- grep like "foo | bar" would misparse; "std::vector" has no surrounding spaces
+-- so real "::" tokens don't collide.
+local SEP = " :: "
 
--- Append the current scope to a picker's base title, e.g.
---   "Find Files  [dir:src/  type:*.ts,*.tsx]"
-local function scope_title(base)
-  local tags = {}
-  if scope.dir then
-    table.insert(tags, "dir:" .. scope.dir)
+-- Session-remembered scope text (the raw left-of-SEP string, e.g. "src *.ts").
+local last_scope = ""
+
+-- Split a full prompt into (scope_str, query) on the first SEP. No SEP => the
+-- whole prompt is the query and there's no scope.
+local function split_input(prompt)
+  local s, e = prompt:find(SEP, 1, true)
+  if s then
+    return vim.trim(prompt:sub(1, s - 1)), prompt:sub(e + 1)
   end
-  if scope.glob then
-    table.insert(tags, "type:" .. table.concat(scope.glob, ","))
-  end
-  if #tags == 0 then
-    return base
-  end
-  return base .. "  [" .. table.concat(tags, "  ") .. "]"
+  return "", prompt
 end
 
--- Build the find_files command for the current scope. Passed as a *function* to
--- the picker (telescope calls it per launch), so it always reflects the latest
--- scope.dir / scope.glob.
---
--- rg/fd respect .gitignore by default, so gitignored files like .env never show
--- up (`hidden = true` only adds non-ignored dotfiles). A positive rg glob can't
--- be added to whitelist them: it acts as a restrictive filter and hides
--- everything else. So with no file-type filter we union two passes:
---   1. normal listing (respects .gitignore) + --hidden for dotfiles
---   2. --no-ignore listing restricted to .env files, to force them in
--- node_modules/, dist/, etc. stay hidden (.gitignore + file_ignore_patterns),
--- while .env / .env.* always appear.
---
--- When scope.glob is set the user has asked for specific file types, so the
--- positive-glob filter is exactly what we want — collapse to a single pass and
--- drop the .env union. Multiple globs become multiple --glob flags, which rg
--- OR's together. scope.dir, when set, becomes rg's search path; otherwise rg
--- searches the cwd.
-local function find_command()
-  local dir = scope.dir and (" " .. vim.fn.shellescape(scope.dir)) or ""
-  if scope.glob then
-    local globs = {}
-    for _, g in ipairs(scope.glob) do
-      table.insert(globs, "--glob " .. vim.fn.shellescape(g))
+-- Parse a scope string into (dirs, globs) using the grammar above: leading
+-- plain tokens are directories, then the first glob-metachar token flips into
+-- glob mode and everything after is a file-type glob. Returns a (possibly
+-- empty) dirs list and a globs list or nil.
+local function parse_scope(scope_str)
+  local dirs, globs = {}, {}
+  local in_globs = false
+  for tok in scope_str:gmatch("%S+") do
+    if not in_globs and tok:find("[%*%?%[]") then
+      in_globs = true
+    end
+    if in_globs then
+      globs[#globs + 1] = tok
+    else
+      dirs[#dirs + 1] = vim.fn.expand(tok)
+    end
+  end
+  return dirs, (#globs > 0 and globs or nil)
+end
+
+-- Pre-fill for a freshly opened picker: remembered scope + separator (cursor
+-- lands at the end, ready for the query), or empty when there's no scope.
+local function prefill()
+  return last_scope ~= "" and (last_scope .. SEP) or ""
+end
+
+-- Build the `rg --files` command for find_files. With a file-type filter we run
+-- a single positive-glob pass; with no filter we union a normal (gitignore-
+-- respecting) listing with a forced .env listing, so .env / .env.* always show
+-- while node_modules/, dist/, etc. stay hidden. Each dir in `dirs` becomes an
+-- rg search root; an empty list means search the cwd.
+local function files_command(dirs, globs)
+  local d = ""
+  for _, dir in ipairs(dirs) do
+    d = d .. " " .. vim.fn.shellescape(dir)
+  end
+  if globs then
+    local gs = {}
+    for _, g in ipairs(globs) do
+      gs[#gs + 1] = "--glob " .. vim.fn.shellescape(g)
     end
     return {
       "sh",
       "-c",
-      "rg --files --hidden --glob '!**/.git/*' "
-        .. table.concat(globs, " ")
-        .. dir
-        .. " | sort -u",
+      "rg --files --hidden --glob '!**/.git/*' " .. table.concat(gs, " ") .. d .. " | sort -u",
     }
   end
   return {
     "sh",
     "-c",
     table.concat({
-      "rg --files --hidden --glob '!**/.git/*'" .. dir,
-      "rg --files --no-ignore --glob '!**/.git/*' --glob '**/.env' --glob '**/.env.*'" .. dir,
+      "rg --files --hidden --glob '!**/.git/*'" .. d,
+      "rg --files --no-ignore --glob '!**/.git/*' --glob '**/.env' --glob '**/.env.*'" .. d,
     }, "; ") .. " | sort -u",
   }
 end
 
--- Picker launchers that stamp the scope into the title. find_files reads its
--- (scope-aware) find_command from the picker config; live_grep takes the scope
--- as call-time opts.
+-- <C-p>: find files. The oneshot listing is rebuilt only when the scope half
+-- changes (via updated_finder); the query half is handed to the sorter alone so
+-- filename fuzzy-matching keeps working.
 local function find_files()
-  require("telescope.builtin").find_files({ prompt_title = scope_title("Find Files") })
-end
+  local builtin = require("telescope.builtin")
+  local finders = require("telescope.finders")
+  local make_entry = require("telescope.make_entry")
 
-local function live_grep()
-  require("telescope.builtin").live_grep({
-    prompt_title = scope_title("Live Grep"),
-    search_dirs = scope.dir and { scope.dir } or nil,
-    glob_pattern = scope.glob,
-  })
-end
+  local dirs0, globs0 = parse_scope(last_scope)
+  local prev_scope = last_scope
 
--- A small floating single-line input, used in place of vim.ui.input for the
--- scope prompt. The built-in cmdline input can't show a selection, so the
--- existing scope can't be highlighted; this opens a real buffer pre-filled with
--- the current scope and selects it (Visual mode) so a single keystroke wipes or
--- rewrites it — `d`/`x` to drop the filter, `c` (or just retype) to replace it.
--- <Tab> does file-path completion for the path token, <CR> confirms, and
--- <Esc>/<C-c> cancels — returning nil like vim.ui.input, so the caller's
--- "cancel leaves scope untouched / blank clears" logic is unchanged.
-local function scope_input(prompt, default, on_confirm)
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.bo[buf].bufhidden = "wipe"
-  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { default })
-
-  local win = vim.api.nvim_open_win(buf, true, {
-    relative = "cursor",
-    row = 1,
-    col = 0,
-    width = math.max(50, #default + 10),
-    height = 1,
-    style = "minimal",
-    border = "rounded",
-    title = " " .. prompt .. " ",
-    title_pos = "left",
-  })
-
-  local answered = false
-  local function finish(value)
-    if answered then
-      return
-    end
-    answered = true
-    vim.cmd("stopinsert")
-    pcall(vim.api.nvim_win_close, win, true)
-    on_confirm(value)
-  end
-
-  vim.api.nvim_create_autocmd("BufLeave", {
-    buffer = buf,
-    once = true,
-    callback = function()
-      finish(nil)
+  builtin.find_files({
+    prompt_title = "Find Files  (scope :: query)",
+    default_text = prefill(),
+    -- Initial listing honours the pre-filled scope.
+    find_command = function()
+      return files_command(dirs0, globs0)
+    end,
+    on_input_filter_cb = function(prompt)
+      local scope_str, query = split_input(prompt)
+      last_scope = scope_str
+      local result = { prompt = query }
+      if scope_str ~= prev_scope then
+        prev_scope = scope_str
+        local dirs, globs = parse_scope(scope_str)
+        result.updated_finder =
+          finders.new_oneshot_job(files_command(dirs, globs), { entry_maker = make_entry.gen_from_file({}) })
+      end
+      return result
     end,
   })
-
-  local function map(modes, lhs, rhs, opts)
-    vim.keymap.set(modes, lhs, rhs, vim.tbl_extend("force", { buffer = buf, nowait = true }, opts or {}))
-  end
-  map({ "n", "i", "v", "s" }, "<CR>", function()
-    -- Join in case a Visual change left more than one line; the caller
-    -- re-tokenises on whitespace anyway.
-    finish(vim.trim(table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, false), " ")))
-  end)
-  map({ "n", "i", "v", "s" }, "<C-c>", function()
-    finish(nil)
-  end)
-  -- Esc only cancels from normal mode, so a first Esc can drop Visual/Select
-  -- back to normal for editing, and a second Esc cancels the prompt.
-  map("n", "<Esc>", function()
-    finish(nil)
-  end)
-  -- <Tab>/<S-Tab> drive built-in file-name completion (and cycle the menu).
-  map("i", "<Tab>", function()
-    return vim.fn.pumvisible() == 1 and "<C-n>" or "<C-x><C-f>"
-  end, { expr = true })
-  map("i", "<S-Tab>", function()
-    return vim.fn.pumvisible() == 1 and "<C-p>" or ""
-  end, { expr = true })
-
-  -- Highlight the prefilled scope so it's ready to remove/replace; with nothing
-  -- prefilled just start typing.
-  if default ~= "" then
-    vim.cmd("normal! gg0vg_")
-  else
-    vim.cmd("startinsert")
-  end
 end
 
--- Single <leader>s setter for the whole scope: one prompt takes a path and/or
--- file types, e.g. "src *.ts *.tsx". The input is authoritative — whatever you
--- submit fully replaces the previous scope, so anything you leave out is
--- cleared. Parsing rule:
---   * tokens are whitespace-separated
---   * if the FIRST token contains a glob metachar (* ? [) the input is treated
---     as types only (dir = whole project) — e.g. "*.ts" or "src/**/*.ts"
---   * otherwise the first token is the path and the rest are file-type globs
--- Submitting blank clears everything; cancelling (Esc) leaves the scope as-is.
--- The path may point outside the cwd (absolute, ~/…, or ../…) — rg searches it
--- as a root; matches just display relative to the cwd (so "../sib/foo.ts").
-local function set_filter()
-  -- Pre-fill with the current scope so it round-trips and can be edited.
-  local default = scope.dir or ""
-  if scope.glob then
-    default = (default ~= "" and default .. " " or "") .. table.concat(scope.glob, " ")
-  end
-  scope_input(
-    'Scope: <path> <types>  e.g. src *.ts *.tsx  (blank clears)',
-    default,
-    function(input)
-      if input == nil then
-        return
-      end
-      local tokens = {}
-      for tok in input:gmatch("%S+") do
-        table.insert(tokens, tok)
-      end
-      if #tokens == 0 then
-        scope.dir, scope.glob = nil, nil
-        vim.notify("Telescope scope cleared")
-        return
-      end
-      -- First token is a glob (types only) if it carries a glob metachar;
-      -- otherwise it's the search path and the remaining tokens are types.
-      local start = 1
-      if tokens[1]:find("[%*%?%[]") then
-        scope.dir = nil
-      else
-        scope.dir = vim.fn.expand(tokens[1])
-        start = 2
-      end
-      local globs = {}
-      for i = start, #tokens do
-        table.insert(globs, tokens[i])
-      end
-      scope.glob = #globs > 0 and globs or nil
-      vim.notify(
-        ("Telescope scope — dir: %s  types: %s"):format(
-          scope.dir or "<project>",
-          scope.glob and table.concat(scope.glob, ", ") or "<all>"
-        )
-      )
+-- <leader>f: live grep. A job finder rebuilds the rg command every keystroke,
+-- turning the scope half into --glob / search-root args and passing the query
+-- half as the rg pattern. Sorter is highlighter_only so rg does the filtering.
+local function live_grep()
+  local finders = require("telescope.finders")
+  local pickers = require("telescope.pickers")
+  local sorters = require("telescope.sorters")
+  local make_entry = require("telescope.make_entry")
+  local conf = require("telescope.config").values
+
+  local opts = { cwd = vim.loop.cwd() }
+
+  local grepper = finders.new_job(function(prompt)
+    if not prompt or prompt == "" then
+      return nil
     end
-  )
+    local scope_str, query = split_input(prompt)
+    last_scope = scope_str
+    if query == "" then
+      return nil
+    end
+    local dirs, globs = parse_scope(scope_str)
+    -- Start from the configured vimgrep args (first element is "rg") so the
+    -- picker's grep flags stay in one place; deepcopy since new_job mutates it.
+    local cmd = vim.deepcopy(conf.vimgrep_arguments)
+    if globs then
+      for _, g in ipairs(globs) do
+        cmd[#cmd + 1] = "--glob=" .. g
+      end
+    end
+    cmd[#cmd + 1] = "--"
+    cmd[#cmd + 1] = query
+    for _, dir in ipairs(dirs) do
+      cmd[#cmd + 1] = dir
+    end
+    return cmd
+  end, make_entry.gen_from_vimgrep(opts), nil, opts.cwd)
+
+  pickers
+    .new(opts, {
+      prompt_title = "Live Grep  (scope :: query)",
+      default_text = prefill(),
+      finder = grepper,
+      previewer = conf.grep_previewer(opts),
+      sorter = sorters.highlighter_only(opts),
+    })
+    :find()
 end
 
 return {
@@ -225,12 +193,10 @@ return {
   cmd = "Telescope",
   keys = {
     -- ctrl+p quickOpen
-    { "<C-p>",      find_files,                                       desc = "Find files" },
+    { "<C-p>",     find_files,                                       desc = "Find files" },
     -- <leader>f findInFiles
-    { "<leader>f",  live_grep,                                        desc = "Grep files" },
-    { "<leader>w",  "<cmd>Telescope buffers initial_mode=normal<CR>", desc = "Buffers" },
-    -- Session search scope: one prompt for path + file types (blank clears).
-    { "<leader>s",  set_filter,                                       desc = "Telescope: set search scope" },
+    { "<leader>f", live_grep,                                        desc = "Grep files" },
+    { "<leader>w", "<cmd>Telescope buffers initial_mode=normal<CR>", desc = "Buffers" },
   },
   config = function()
     local telescope = require("telescope")
@@ -261,6 +227,11 @@ return {
 
     telescope.setup({
       defaults = {
+        -- Drop the "> " prompt prefix. It's a read-only region of the Vim
+        -- prompt buffer, so in normal mode the cursor snags on it and d/x/c are
+        -- blocked when a selection sits over it. With no prefix the whole prompt
+        -- line is editable text and normal-mode edits work everywhere.
+        prompt_prefix = "",
         -- nvim-treesitter `main` branch dropped the parsers.ft_to_lang API that
         -- telescope 0.1.x previewers call, so disable TS preview highlighting.
         preview = { treesitter = false },
@@ -297,12 +268,6 @@ return {
             n = { ["dd"] = actions.delete_buffer },
             i = { ["<C-d>"] = actions.delete_buffer },
           },
-        },
-        -- find_command is the scope-aware function defined above; telescope
-        -- calls it on each launch, so the active <leader>s* scope (dir + file
-        -- type) is applied to find_files automatically.
-        find_files = {
-          find_command = find_command,
         },
       },
     })
