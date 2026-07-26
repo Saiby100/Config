@@ -46,7 +46,8 @@ if command -v brew >/dev/null && ! command -v delta >/dev/null; then
 fi
 
 # Install the tmux plugin manager (TPM) and the plugins declared in .tmux.conf.
-# Without this, the theme and vim-tmux-navigator silently do nothing.
+# Without this, vim-tmux-navigator's C-h/j/k/l pane navigation silently does
+# nothing. (The status bar is styled inline in .tmux.conf, not by a plugin.)
 TPM_DIR="$HOME/.tmux/plugins/tpm"
 if [ ! -d "$TPM_DIR" ]; then
   git clone https://github.com/tmux-plugins/tpm "$TPM_DIR"
