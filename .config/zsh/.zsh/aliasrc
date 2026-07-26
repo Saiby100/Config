@@ -31,6 +31,10 @@ alias rn='mv $1 $2'
 alias cc='claude'
 alias lg='lazygit'
 
+# Attach to the last-used tmux session, or start one named Workspace if there
+# is none. Nothing starts tmux automatically any more — this is the entry point.
+alias t='tmux attach || tmux new-session -s Workspace'
+
 # Configure Files
 alias zrc='nvim $HOME/.config/zsh/.zshrc'
 alias zal='nvim $HOME/.config/zsh/.zsh/aliasrc'

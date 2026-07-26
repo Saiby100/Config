@@ -1,7 +1,3 @@
-if [ -z "$TMUX" ]; then
-  tmux new-session
-fi
-
 # Prompt — custom git status via git_remote_status() defined below.
 setopt prompt_subst
 PROMPT=' %B%F{#de9dac}%~%b
