@@ -7,9 +7,13 @@ ln -sf "$REPO_DIR/.zshenv" "$HOME/.zshenv"
 ln -sf "$REPO_DIR/.tmux.conf" "$HOME/.tmux.conf"
 
 # Claude Code writes into ~/.claude (caches, backups, settings it mutates), so
-# only link the statusline script — settings.json is left as a live file.
+# only link the scripts — settings.json is left as a live file. Note that the
+# hooks wiring tmux-claude-state.sh to Claude's Notification/Stop/
+# UserPromptSubmit events lives in that unmanaged settings.json, so a fresh
+# machine needs them re-added by hand.
 mkdir -p "$HOME/.claude"
 ln -sf "$REPO_DIR/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
+ln -sf "$REPO_DIR/.claude/tmux-claude-state.sh" "$HOME/.claude/tmux-claude-state.sh"
 for dir in nvim zsh ghostty lazygit; do
   rm -rf "$HOME/.config/$dir"
   ln -s "$REPO_DIR/.config/$dir" "$HOME/.config/$dir"
