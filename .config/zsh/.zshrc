@@ -50,6 +50,29 @@ function git_remote_status() {
   fi
 }
 
+# Open a directory as an Obsidian vault: `obs` (cwd) or `obs ~/some/vault`.
+# Obsidian only takes a folder via its obsidian:// URI, so the path has to be
+# percent-encoded first. nomultibyte makes the loop walk raw bytes, which is
+# what turns a non-ASCII char into its UTF-8 escapes (ü -> %C3%BC) rather than
+# a single wrong codepoint escape.
+function obs() {
+  emulate -L zsh
+  setopt localoptions nomultibyte
+  local dir="${1:-$PWD}"
+  dir="$(cd -- "$dir" 2>/dev/null && pwd)" || {
+    print -u2 "obs: no such directory: ${1}"; return 1
+  }
+  local enc="" c i
+  for (( i = 1; i <= ${#dir}; i++ )); do
+    c="${dir[i]}"
+    case "$c" in
+      ([a-zA-Z0-9._~-]) enc+="$c" ;;   # RFC 3986 unreserved — safe as-is
+      (*)               enc+="$(printf '%%%02X' "'$c")" ;;
+    esac
+  done
+  open "obsidian://open?path=$enc"
+}
+
 #Path Variables
 export PATH=$HOME/.local/bin:$PATH
 
