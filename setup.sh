@@ -14,6 +14,19 @@ ln -sf "$REPO_DIR/.tmux.conf" "$HOME/.tmux.conf"
 mkdir -p "$HOME/.claude"
 ln -sf "$REPO_DIR/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 ln -sf "$REPO_DIR/.claude/tmux-claude-state.sh" "$HOME/.claude/tmux-claude-state.sh"
+
+# Skills are ours alone and Claude never rewrites them, so the whole dir can be
+# linked. Unlike the loop below this never deletes what is in the way: a real
+# non-empty skills/ dir holds skills that aren't tracked here, and losing them
+# silently would be worse than not linking.
+CLAUDE_SKILLS="$HOME/.claude/skills"
+if [ -d "$CLAUDE_SKILLS" ] && [ ! -L "$CLAUDE_SKILLS" ] && ! rmdir "$CLAUDE_SKILLS" 2>/dev/null; then
+  echo "! $CLAUDE_SKILLS is a non-empty real directory — move its contents into" >&2
+  echo "  $REPO_DIR/.claude/skills, then re-run to link it." >&2
+else
+  ln -sfn "$REPO_DIR/.claude/skills" "$CLAUDE_SKILLS"
+fi
+
 for dir in nvim zsh ghostty lazygit tmux; do
   rm -rf "$HOME/.config/$dir"
   ln -s "$REPO_DIR/.config/$dir" "$HOME/.config/$dir"
