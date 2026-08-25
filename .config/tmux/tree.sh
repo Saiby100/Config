@@ -204,7 +204,7 @@ act() {
   save_pos "$key" "${pos:-0}" "$verb"
 
   case $verb in
-    fold|collapse|expand)
+    collapse|expand)
       # h on a pane closes the window holding it, the way h on a file closes
       # its directory in a file tree — otherwise the key is a dead end on a
       # third of the rows. Panes have nothing of their own to fold.
@@ -215,7 +215,12 @@ act() {
       touch "$FOLD_FILE"
       if grep -qxF "$key" "$FOLD_FILE"; then
         [ "$verb" = collapse ] && exit 0
-        grep -vxF "$key" "$FOLD_FILE" > "$FOLD_FILE.tmp" && mv "$FOLD_FILE.tmp" "$FOLD_FILE"
+        # Not `grep ... && mv`: grep exits 1 when it selects no lines, and
+        # unfolding the last folded row is exactly that case — so the mv was
+        # skipped and the row never opened. The redirection has already
+        # written the (possibly empty) file by then, so move it regardless.
+        grep -vxF "$key" "$FOLD_FILE" > "$FOLD_FILE.tmp"
+        mv "$FOLD_FILE.tmp" "$FOLD_FILE"
       else
         [ "$verb" = expand ] && exit 0
         printf '%s\n' "$key" >> "$FOLD_FILE"
@@ -380,14 +385,16 @@ P_INSERT="$prompt"
 P_NORMAL="$C_YELLOW$prompt"
 
 # ctrl-based keys work in both modes, so nothing has to be remembered twice —
-# normal mode adds unshifted aliases for the ones that stay in the popup (with
-# h/l for fold in place of ^space, since a tree wants a direction not a
-# toggle: h always closes, l always opens, whatever the row is doing now), and
+# normal mode adds unshifted aliases for the ones that stay in the popup, and
 # leaves send and grab on ^s/^g because both close the popup and fzf reports a
 # closing key through --expect, which is not a binding and so cannot be
 # rebound per mode.
+#
+# Folding is the exception: it is h/l only, with no ctrl alias. A tree wants a
+# direction rather than a toggle — h always closes, l always opens, whatever
+# the row is doing now — and there is no unmodified pair to alias it to.
 header='j/k move  h/l fold  g/G ends  d/u page  n new  r rename  x kill  p preview  q quit
-i or / to search (esc back)   ^j ^k ^n ^r ^x ^space fold  ^s send  ^g grab   ↵ act'
+i or / to search (esc back)   ^j ^k ^n ^r ^x  ^s send  ^g grab   ↵ act'
 
 out=$(list | fzf \
   --ansi \
@@ -415,7 +422,6 @@ out=$(list | fzf \
   --bind='?:toggle-preview' \
   --bind="change:reload('$SELF' list {q})" \
   --bind='alt-j:preview-down,alt-k:preview-up' \
-  --bind="ctrl-space:execute-silent('$SELF' act fold {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="ctrl-n:execute('$SELF' act new {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="ctrl-r:execute('$SELF' act rename {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="ctrl-x:execute('$SELF' act kill {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
