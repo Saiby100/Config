@@ -12,6 +12,7 @@ brew "lazygit"                  # git TUI (`lg` alias); .config/lazygit
 brew "ripgrep"                  # Telescope find_files / live_grep need it
 brew "tree-sitter-cli"          # nvim-treesitter compiles parsers with it
 brew "git-delta"                # lazygit diff pager (syntax-highlighted diffs)
+brew "fzf"                      # prefix+w tmux tree popup (.config/tmux/tree.sh)
 brew "autojump"                 # directory jumping; sourced by .zshrc
 brew "zsh-autosuggestions"      # sourced by .zshrc
 brew "zsh-syntax-highlighting"  # sourced by .zshrc (must load last)

@@ -14,7 +14,7 @@ ln -sf "$REPO_DIR/.tmux.conf" "$HOME/.tmux.conf"
 mkdir -p "$HOME/.claude"
 ln -sf "$REPO_DIR/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 ln -sf "$REPO_DIR/.claude/tmux-claude-state.sh" "$HOME/.claude/tmux-claude-state.sh"
-for dir in nvim zsh ghostty lazygit; do
+for dir in nvim zsh ghostty lazygit tmux; do
   rm -rf "$HOME/.config/$dir"
   ln -s "$REPO_DIR/.config/$dir" "$HOME/.config/$dir"
 done

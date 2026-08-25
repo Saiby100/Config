@@ -9,7 +9,7 @@ Install these before running the setup script.
 ### macOS (Homebrew)
 
 ```sh
-brew install neovim tmux lazygit ghostty ripgrep tree-sitter-cli git-delta
+brew install neovim tmux lazygit ghostty ripgrep tree-sitter-cli git-delta fzf
 brew install --cask font-jetbrains-mono-nerd-font
 ```
 
@@ -25,6 +25,7 @@ sudo apt install neovim tmux zsh ripgrep git-delta
 - [JetBrainsMono Nerd Font](https://www.nerdfonts.com/font-downloads) — used by Ghostty
 - [ripgrep](https://github.com/BurntSushi/ripgrep) — required by Telescope's `find_files` and `live_grep`; without it the pickers return no results
 - [tree-sitter CLI](https://github.com/tree-sitter/tree-sitter) — nvim-treesitter's `main` branch compiles parsers with it; without it syntax highlighting silently fails
+- [fzf](https://github.com/junegunn/fzf) — powers the `prefix + w` tmux tree popup; without it the popup just prints an install hint
 - [delta](https://github.com/dandavison/delta) (`git-delta`) — lazygit pipes diffs through it for syntax-highlighted, word-level review; without it on PATH lazygit falls back to raw diffs
 
 ### Shared
@@ -50,6 +51,7 @@ This creates symlinks for:
 | `.config/nvim` | `~/.config/nvim` |
 | `.config/zsh` | `~/.config/zsh` |
 | `.config/ghostty` | `~/.config/ghostty` |
+| `.config/tmux` | `~/.config/tmux` |
 | `.config/lazygit` | `~/.config/lazygit` (+ `~/Library/Application Support/lazygit/config.yml` on macOS) |
 
 On macOS, lazygit ignores `~/.config` and reads from
@@ -71,6 +73,7 @@ effect without a manual `prefix + I` or server restart.
   ghostty/config               # Terminal (One Dark Two, JetBrainsMono Nerd Font)
   lazygit/config.yml           # Lazygit (review-focused layout, delta pager, pink/cyan theme)
   nvim/                        # Neovim (lazy.nvim, onedark, LSP, telescope)
+  tmux/tree.sh                 # fzf session/window/pane tree behind prefix + w
   zsh/
     .zshrc                     # Shell config (prompt, history, completions)
     .zsh/aliasrc               # Aliases and shortcuts
