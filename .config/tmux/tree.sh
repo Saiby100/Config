@@ -264,12 +264,6 @@ target() {
 # against whatever tmux considers current, not against the chosen row.
 cwd_of() { tmux display-message -p -t "$1" '#{pane_current_path}'; }
 
-ask() {
-  printf '%s' "$1" >&2
-  read -r REPLY_ || return 1
-  [ -n "$REPLY_" ]
-}
-
 pause() {
   printf '\n\nPress enter to continue.'
   read -r _
@@ -354,12 +348,17 @@ move_marked() {
 }
 
 # --- Mutations -------------------------------------------------------------
-# Run from fzf execute() bindings, which hand the child the terminal, so a
-# read -r prompt draws over the list and hands control back on enter. Each is
-# followed by reload($SELF list) in the binding, so the tree redraws in place
-# and the popup never closes for a create, rename, kill or fold.
+# Run from fzf bindings, each followed by reload($SELF list), so the tree
+# redraws in place and the popup never closes for a create, rename, kill or
+# fold.
+#
+# Anything that needs a name or a confirmation is handed it as $4 rather than
+# reading it here. That is the whole reason act() no longer prompts: a prompt
+# of its own needs the terminal, and fzf only gives a child the terminal by
+# painting it over the list. See Prompt mode below for where the typing happens
+# instead.
 act() {
-  verb=$1 key=$2 pos=$3
+  verb=$1 key=$2 pos=$3 text=$4
   [ -n "$key" ] || exit 0
   tgt=$(target "$key")
   save_pos "$key" "${pos:-0}" "$verb"
@@ -389,42 +388,38 @@ act() {
       ;;
     new)
       # What "new" means is read off the cursor: a sibling of whatever it sits
-      # on. Sessions and windows are prompted for a name — an unnamed one is
-      # exactly the one you forget is open, the same reasoning as bind c/C in
-      # .tmux.conf. Panes have no name to ask for.
+      # on. Sessions and windows are named — an unnamed one is exactly the one
+      # you forget is open, the same reasoning as bind c/C in .tmux.conf. Panes
+      # have no name to ask for, which is why p: is the one row where n does
+      # not open a prompt.
       case $key in
-        s:*) ask "New session name: " &&
-             tmux new-session -d -s "$REPLY_" -c "$(cwd_of "$tgt")" ;;
+        s:*) tmux new-session -d -s "$text" -c "$(cwd_of "$tgt")" ;;
         # -a inserts after the window under the cursor; without it a bare
         # index that is already taken is an error rather than a sibling.
-        w:*) ask "New window name: " &&
-             tmux new-window -d -a -n "$REPLY_" -t "$tgt" -c "$(cwd_of "$tgt")" ;;
+        w:*) tmux new-window -d -a -n "$text" -t "$tgt" -c "$(cwd_of "$tgt")" ;;
         p:*) tmux split-window -h -d -t "$tgt" -c "$(cwd_of "$tgt")" ;;
       esac
       ;;
     rename)
       case $key in
-        s:*) ask "Rename session to: " && tmux rename-session -t "$tgt" "$REPLY_" ;;
-        w:*) ask "Rename window to: " && {
-               tmux rename-window -t "$tgt" "$REPLY_"
-               # automatic-rename is on globally in .tmux.conf, so a hand-typed
-               # name would be overwritten by the directory basename on the next
-               # cd. tmux does turn it off itself on rename-window, but saying so
-               # explicitly costs nothing and does not depend on that staying true.
-               tmux set-window-option -t "$tgt" automatic-rename off
-             } ;;
-        p:*) ask "Pane title: " && tmux select-pane -t "$tgt" -T "$REPLY_" ;;
+        s:*) tmux rename-session -t "$tgt" "$text" ;;
+        w:*) tmux rename-window -t "$tgt" "$text"
+             # automatic-rename is on globally in .tmux.conf, so a hand-typed
+             # name would be overwritten by the directory basename on the next
+             # cd. tmux does turn it off itself on rename-window, but saying so
+             # explicitly costs nothing and does not depend on that staying true.
+             tmux set-window-option -t "$tgt" automatic-rename off ;;
+        p:*) tmux select-pane -t "$tgt" -T "$text" ;;
       esac
       ;;
     kill)
-      # Only sessions confirm. A session takes every window and pane with it,
-      # and a mistyped fuzzy match is a real way to lose one; a pane or window
-      # is cheap enough that a y/n on every kill would defeat the point of
-      # having the key here at all.
+      # Only sessions confirm, and the confirmation happens before act() is
+      # reached — a session takes every window and pane with it, and a mistyped
+      # fuzzy match is a real way to lose one; a pane or window is cheap enough
+      # that a confirmation on every kill would defeat the point of having the
+      # key here at all.
       case $key in
-        s:*) printf "kill session '%s'? (y/n) " "${key#s:}" >&2
-             read -r yn
-             case $yn in y|Y) tmux kill-session -t "$tgt" ;; esac ;;
+        s:*) tmux kill-session -t "$tgt" ;;
         w:*) tmux kill-window -t "$tgt" ;;
         p:*) tmux kill-pane -t "$tgt" ;;
       esac
@@ -482,61 +477,6 @@ save_pos() {
   printf 'pos(%d)' "$(($2 + 1 - _off))" > "$POS_FILE"
 }
 
-# `:N` is the same cursor handoff read the other way round: nothing is being
-# mutated, so there is no position to work out — the number typed *is* the
-# position. It goes to the same file so the same after-act transform applies it.
-#
-# execute() rather than execute-silent(), for the reason the mutation prompts
-# use it: the child needs the terminal to draw its prompt and read a line. A
-# blank or non-numeric answer writes nothing, and an empty transform leaves the
-# cursor where it was — so backing out of the prompt costs nothing.
-goto() {
-  ask "Go to row: " || exit 0
-  case $REPLY_ in
-    ''|*[!0-9]*) exit 0 ;;
-  esac
-  printf 'pos(%d)' "$REPLY_" > "$POS_FILE"
-}
-
-case ${1:-} in
-  list)    list "$2"; exit 0 ;;
-  goto)    goto; exit 0 ;;
-  after-act) cat "$POS_FILE" 2>/dev/null; rm -f "$POS_FILE"; exit 0 ;;
-  act)     act "$2" "$3" "$4"; exit 0 ;;
-  preview) tmux capture-pane -ep -t "$(target "$2")" 2>/dev/null; exit 0 ;;
-esac
-
-# --- Interactive -----------------------------------------------------------
-command -v fzf >/dev/null 2>&1 || die "fzf not found on PATH.
-
-  brew install fzf
-
-PATH was:
-$PATH"
-
-# Resolved here rather than passed in from the binding, because display-popup
-# does NOT format-expand its shell-command — passing '#{pane_id}' handed the
-# script the literal placeholder. Asking tmux from inside the popup works: the
-# popup belongs to the client, so these resolve against the client's active
-# pane, not against the popup itself. Exported so the reload/execute children
-# see the same answers.
-SRC_PANE=$(tmux display-message -p '#{pane_id}')
-SRC_SESSION=$(tmux display-message -p '#{session_name}')
-export SRC_PANE SRC_SESSION
-[ -n "$SRC_PANE" ] || die "could not determine the current tmux pane."
-
-# Folds are reseeded on every open rather than persisted: the popup opens on the
-# whole tree — the question it answers is what is open everywhere, not just here
-# — and a fold you set is only ever meant to last as long as the popup is up.
-: > "$FOLD_FILE"
-# Marks are reseeded empty for the same reason, and more strongly: a mark left
-# over from a previous popup would name a row you have since forgotten about,
-# and M would move it.
-: > "$MARK_FILE"
-rm -f "$POS_FILE"
-
-prompt="$SRC_SESSION > "
-
 # --- Modal editing ---------------------------------------------------------
 # fzf has no modes, but it has unbind() and rebind(), and that is enough to
 # build one: every normal-mode key is declared as a binding, i/a// unbind the
@@ -556,6 +496,10 @@ prompt="$SRC_SESSION > "
 # in normal mode would silently land in the query and start filtering, so the
 # mode would only be as real as your memory of which letters do something.
 # Bound to ignore, normal mode is inert except where it is not.
+#
+# There is a third mode: prompt mode, where the query line is borrowed as the
+# input box for a name or a confirmation. It unbinds the same set — the keys
+# have to type for it too — and is unwound by enter or esc. See Prompt mode.
 VIM_NAV='j,k,g,G,d,u,:'
 VIM_MODE='i,a,/,q'
 VIM_ACT='h,l,n,r,x,p,m,M,U'
@@ -571,12 +515,167 @@ done
 MODAL_KEYS="$VIM_NAV,$VIM_MODE,$VIM_ACT${dead_keys}"
 dead_binds=${dead_binds#,}
 
-# The prompt is the mode indicator, and it is yellow in normal mode for the
-# same reason the status bar turns yellow while the prefix is pending: yellow
-# here means "the next key does something other than what it says". Since the
-# popup starts in normal mode, that is also the prompt it opens with.
-P_INSERT="$prompt"
-P_NORMAL="$C_YELLOW$prompt"
+# The prompt is the mode indicator twice over. It says what the query line is
+# for — "Search" normally, the action's own label while one is pending — and it
+# is yellow in normal mode for the same reason the status bar turns yellow while
+# the prefix is pending: yellow here means "the next key does something other
+# than what it says". Since the popup starts in normal mode, that is also the
+# prompt it opens with.
+P_TAIL='> '
+P_INSERT="Search $P_TAIL"
+P_NORMAL="$C_YELLOW$P_INSERT"
+
+# --- Prompt mode -----------------------------------------------------------
+# Naming a new window, renaming a row, confirming a kill and jumping to a row
+# number all need a line of text. They used to read it in an execute() child,
+# which fzf gives the terminal to — so the child's prompt painted over the very
+# tree you were about to act on, and you typed a new name for a row you could
+# no longer see.
+#
+# So the query line is borrowed instead. It is already an input box sitting
+# under the list; the only reasons it filters and searches are two bindings and
+# a flag, and fzf can turn all three off:
+#
+#   disable-search   what you type stops filtering the list, but {q} still
+#                    carries it, so the tree stays whole and on screen
+#   unbind(change)   and stops rebuilding it on every keystroke
+#   unbind(MODAL)    the normal-mode keys type again, exactly as i does
+#   change-prompt    the label says which prompt this is
+#
+# What is pending lives in a file, since fzf holds no state of its own: enter
+# and esc are one binding each and have to work out from somewhere whether
+# there is a prompt open to commit or cancel.
+PEND_FILE="${TMPDIR:-/tmp}/tmux-tree-pending"
+
+# The label is the only thing that says which prompt is open, so it names the
+# row type too — "New window" and "New session" are different enough answers
+# to be worth distinguishing before you type, not after.
+prompt_label() {
+  case $1:$2 in
+    new:s:*)    printf 'New session' ;;
+    new:w:*)    printf 'New window' ;;
+    rename:p:*) printf 'Pane title' ;;
+    rename:*)   printf 'Rename' ;;
+    kill:*)     printf 'Kill session?' ;;
+    goto:*)     printf 'Go to row' ;;
+  esac
+}
+
+open_prompt() {
+  printf '%s\t%s\t%s\n' "$1" "$2" "$3" > "$PEND_FILE"
+  # The cursor has to survive the reload the binding does next, and the row is
+  # not moving, so this is the ordinary no-offset case save_pos already covers.
+  save_pos "$2" "${3:-0}" prompt
+  printf 'disable-search+unbind(change)+unbind(%s)+clear-query+change-prompt(%s %s)' \
+         "$MODAL_KEYS" "$(prompt_label "$1" "$2")" "$P_TAIL"
+}
+
+# Unwinding is the same four switches thrown back, plus the redraw: the query
+# was cleared on the way in, so `list` with no argument is the unfiltered,
+# numbered tree, and pos() puts the cursor back on the row that was acted on.
+close_prompt() {
+  # act() may have left one behind through save_pos. The position is emitted
+  # here instead, so a stale file would only misplace the next transform.
+  rm -f "$POS_FILE"
+  printf 'clear-query+enable-search+rebind(change)+rebind(%s)+change-prompt(%s)+reload-sync(%s list)+pos(%d)' \
+         "$MODAL_KEYS" "$P_NORMAL" "$SELF" "$1"
+}
+
+# Which verbs need typing is a property of the row, not just the verb: n on a
+# pane is a split with nothing to name, and x on anything but a session does
+# not ask. Those run here and print nothing, leaving the binding's own reload
+# to redraw — which is what every non-prompting key already does.
+begin() {
+  case $1:$2 in
+    goto:*)                  open_prompt "$1" "$2" "$3" ;;
+    *:'')                    exit 0 ;;
+    new:p:*|kill:w:*|kill:p:*) act "$1" "$2" "$3" '' 2>/dev/null ;;
+    *)                       open_prompt "$1" "$2" "$3" ;;
+  esac
+}
+
+# Enter means commit while a prompt is open and jump otherwise, which is why it
+# is a binding rather than --expect: --expect fixes one meaning for the whole
+# run. With nothing pending it prints `accept`, and fzf closes the popup with
+# the row under the cursor exactly as before.
+commit() {
+  [ -s "$PEND_FILE" ] || { printf 'accept'; return; }
+  IFS="$TAB" read -r _verb _key _pos < "$PEND_FILE"
+  rm -f "$PEND_FILE"
+  case $_verb in
+    goto)
+      # A blank or non-numeric answer just closes the prompt, which is the same
+      # thing esc does — there is nothing to half-apply.
+      case $2 in
+        ''|*[!0-9]*) ;;
+        *) _pos=$(($2 - 1)) ;;
+      esac
+      ;;
+    kill)
+      # Enter is the confirmation, so there is nothing to check: esc is how you
+      # back out, the same key that backs out of every other prompt.
+      act kill "$_key" "$_pos" '' 2>/dev/null
+      ;;
+    *)
+      # An empty name cancels rather than renaming something to nothing, which
+      # is what the old read -r prompt did by returning non-zero on a blank.
+      [ -n "$2" ] && act "$_verb" "$_key" "$_pos" "$2" 2>/dev/null
+      ;;
+  esac
+  close_prompt "$((_pos + 1))"
+}
+
+# Esc out of a search is only a mode switch: the query stays, so there is
+# nothing to redraw and no place to restore. Esc out of a prompt is the full
+# unwind, minus the action.
+cancel() {
+  if [ -s "$PEND_FILE" ]; then
+    IFS="$TAB" read -r _verb _key _pos < "$PEND_FILE"
+    rm -f "$PEND_FILE"
+    close_prompt "$((_pos + 1))"
+  else
+    printf 'rebind(%s)+change-prompt(%s)' "$MODAL_KEYS" "$P_NORMAL"
+  fi
+}
+
+case ${1:-} in
+  list)    list "$2"; exit 0 ;;
+  begin)   begin "$2" "$3" "$4"; exit 0 ;;
+  commit)  commit "$2" "$3" "$4"; exit 0 ;;
+  cancel)  cancel; exit 0 ;;
+  after-act) cat "$POS_FILE" 2>/dev/null; rm -f "$POS_FILE"; exit 0 ;;
+  act)     act "$2" "$3" "$4" "$5"; exit 0 ;;
+  preview) tmux capture-pane -ep -t "$(target "$2")" 2>/dev/null; exit 0 ;;
+esac
+
+# --- Interactive -----------------------------------------------------------
+command -v fzf >/dev/null 2>&1 || die "fzf not found on PATH.
+
+  brew install fzf
+
+PATH was:
+$PATH"
+
+# Resolved here rather than passed in from the binding, because display-popup
+# does NOT format-expand its shell-command — passing '#{pane_id}' handed the
+# script the literal placeholder. Asking tmux from inside the popup works: the
+# popup belongs to the client, so these resolve against the client's active
+# pane, not against the popup itself. Exported so the reload/execute children
+# see the same answers.
+SRC_PANE=$(tmux display-message -p '#{pane_id}')
+export SRC_PANE
+[ -n "$SRC_PANE" ] || die "could not determine the current tmux pane."
+
+# Folds are reseeded on every open rather than persisted: the popup opens on the
+# whole tree — the question it answers is what is open everywhere, not just here
+# — and a fold you set is only ever meant to last as long as the popup is up.
+: > "$FOLD_FILE"
+# Marks are reseeded empty for the same reason, and more strongly: a mark left
+# over from a previous popup would name a row you have since forgotten about,
+# and M would move it.
+: > "$MARK_FILE"
+rm -f "$POS_FILE" "$PEND_FILE"
+
 
 # ctrl-based keys work in both modes, so nothing has to be remembered twice:
 # normal mode adds unshifted aliases, and everything that stays in the popup
@@ -588,13 +687,14 @@ P_NORMAL="$C_YELLOW$prompt"
 # direction rather than a toggle — h always closes, l always opens, whatever
 # the row is doing now — and there is no unmodified pair to alias it to.
 #
-# `:` clears the query and rebuilds before prompting. With an empty query, which
-# is the only state that shows numbers, both are no-ops; pressed under a search
-# they put back the list the numbers were counted over, so the answer means what
-# it says rather than landing on the Nth surviving match. reload-sync rather
-# than leaving it to the change event, so the list is back before the prompt.
-header='j/k move  h/l fold  :N row  g/G ends  d/u page  n new  r rename  x kill  p preview  q quit
-m mark  M move marked here  U unmark all   i or / search (esc back)   ^j ^k ^n ^r ^x ^t ^g   ↵ jump'
+# Enter and esc are the two keys with no ctrl form and no dead twin, because
+# they are the only ones that mean different things in different modes: enter
+# jumps or commits, esc leaves a search or cancels a prompt. Both ask the script
+# which it is, since fzf holds no state to ask.
+# Only the keys you would not guess. j/k, h/l, g/G, d/u, enter and esc all do
+# what they do everywhere else, and a header listing them costs a row of tree
+# to say so.
+header=':N row  n new  r rename  x kill  m mark  M move marked  U unmark  / search'
 
 out=$(list | fzf \
   --ansi \
@@ -605,19 +705,19 @@ out=$(list | fzf \
   --prompt="$P_NORMAL" \
   --header="$header" \
   --header-first \
-  --expect=enter \
   --bind='ctrl-j:down,ctrl-k:up' \
-  --bind="esc:rebind($MODAL_KEYS)+change-prompt($P_NORMAL)" \
+  --bind="enter:transform('$SELF' commit {1} {q} {n})" \
+  --bind="esc:transform('$SELF' cancel)" \
   --bind="i:unbind($MODAL_KEYS)+change-prompt($P_INSERT)" \
   --bind="a:unbind($MODAL_KEYS)+change-prompt($P_INSERT)" \
   --bind="/:unbind($MODAL_KEYS)+change-prompt($P_INSERT)" \
   --bind='j:down,k:up,g:first,G:last,d:half-page-down,u:half-page-up' \
-  --bind="::clear-query+reload-sync('$SELF' list)+execute('$SELF' goto)+transform('$SELF' after-act)" \
+  --bind="::transform('$SELF' begin goto {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind='q:abort,p:toggle-preview' \
   --bind="$dead_binds" \
-  --bind="n:execute('$SELF' act new {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
-  --bind="r:execute('$SELF' act rename {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
-  --bind="x:execute('$SELF' act kill {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="n:transform('$SELF' begin new {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="r:transform('$SELF' begin rename {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="x:transform('$SELF' begin kill {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="h:execute-silent('$SELF' act collapse {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="l:execute-silent('$SELF' act expand {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="m:execute-silent('$SELF' act mark {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
@@ -626,9 +726,9 @@ out=$(list | fzf \
   --bind='?:toggle-preview' \
   --bind="change:reload('$SELF' list {q})" \
   --bind='alt-j:preview-down,alt-k:preview-up' \
-  --bind="ctrl-n:execute('$SELF' act new {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
-  --bind="ctrl-r:execute('$SELF' act rename {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
-  --bind="ctrl-x:execute('$SELF' act kill {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="ctrl-n:transform('$SELF' begin new {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="ctrl-r:transform('$SELF' begin rename {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="ctrl-x:transform('$SELF' begin kill {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="ctrl-t:execute-silent('$SELF' act mark {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="ctrl-g:execute('$SELF' act move {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --preview="'$SELF' preview {1}" \
@@ -644,8 +744,9 @@ case "$rc" in
   *)      die "fzf exited with status $rc." ;;
 esac
 
-# Line 1 is the --expect key, line 2 the chosen row.
-key=$(printf '%s\n' "$out" | sed -n 2p | cut -d"$TAB" -f1)
+# One line, the chosen row: enter is a binding printing `accept` now, not
+# --expect, so there is no key line in front of it.
+key=$(printf '%s\n' "$out" | cut -d"$TAB" -f1)
 [ -n "$key" ] || exit 0
 tgt=$(target "$key")
 
