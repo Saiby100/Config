@@ -76,6 +76,7 @@ effect without a manual `prefix + I` or server restart.
   nvim/                        # Neovim (lazy.nvim, onedark, LSP, telescope)
   tmux/tree.sh                 # fzf session/window/pane tree behind prefix + w
   tmux/tailscale-status.sh     # VPN glyph in the tmux status bar
+  tmux/claude-sessions.sh      # Claude-state dot after the session counter
   zsh/
     .zshrc                     # Shell config (prompt, history, completions)
     .zsh/aliasrc               # Aliases and shortcuts

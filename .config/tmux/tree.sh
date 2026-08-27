@@ -113,16 +113,25 @@ fi
 # vault organization"), which identifies a pane far better than the window
 # name or the command (Claude reports a version string, not "claude").
 #
-# The last two fields are the ancestry column, drawn only while searching (see
+# Fields 12 and 13 are the ancestry column, drawn only while searching (see
 # emit below). A search filters the tree down to the matching rows, and a pane
 # row on its own says nothing about which session or window it came out of —
 # the connector to its parent is still drawn, but the parent itself has been
 # filtered away. So each row also carries the names of its ancestors, ready to
 # print when there is no tree left to read them off.
+#
+# The last three are Claude Code's state, written by ~/.claude/tmux-claude-state.sh
+# at pane, window and session scope under three separate names. Every field here
+# is evaluated in pane context, so a pane carries its own state *and* its
+# window's and session's — which is what lets a folded session or window row
+# still show that something inside it finished. The scopes are named separately
+# precisely so this works: were they one name, tmux's pane → window → session
+# option fallback would hand every pane its window's state as its own.
 ROW_FMT="#{session_name}${TAB}#{session_windows}${TAB}#{p46:#{=45:#{session_name}}}${TAB}#{session_windows} window#{?#{==:#{session_windows},1},,s}\
 ${TAB}#{window_index}${TAB}#{window_panes}${TAB}#{p45:#{=44:#{window_name}}}${TAB}#{window_panes} pane#{?#{==:#{window_panes},1},,s}\
 ${TAB}#{pane_id}${TAB}#{p42:#{=41:#{?#{==:#{pane_title},#{host}},#{pane_current_command},#{pane_title}}}}${TAB}#{s|^$HOME|~|:pane_current_path}\
-${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{window_index}: #{window_name}}}"
+${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{window_index}: #{window_name}}}\
+${TAB}#{@claude_pane_state}${TAB}#{@claude_state}${TAB}#{@claude_session_state}"
 
 # --- Building the list -----------------------------------------------------
 # A fold hides rows, and a hidden row cannot be fuzzy-matched — which would
@@ -151,11 +160,17 @@ ${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{windo
 # the same reason: fzf filters the list after awk has numbered it, so under a
 # search the numbers on screen would no longer be the positions they name.
 #
-# Three fixed-width columns sit in front of every label: a four-cell number
-# gutter, a two-cell mark gutter and a two-cell type icon. All three are the
-# same width on every row whatever it holds, so the label padding tmux already
-# did in ROW_FMT still lines the meta column up; only a *varying* width would
-# have to be paid for there.
+# Four fixed-width columns sit in front of every label: a four-cell number
+# gutter, a two-cell mark gutter, a two-cell Claude-state gutter and a two-cell
+# type icon. All four are the same width on every row whatever it holds, so the
+# label padding tmux already did in ROW_FMT still lines the meta column up; only
+# a *varying* width would have to be paid for there.
+#
+# The state gutter is the same ● the tmux status bar draws, yellow for waiting
+# and green for done, and it sits on session and window rows as well as panes.
+# That is the whole point of it: the status bar can only tell you that *some
+# other* session has Claude waiting, and this is where you find out which pane —
+# including when the session or window holding it is folded shut.
 #
 # The icon is what tells a window row from a pane row. They were both plain fg
 # text before, distinguishable only by how deep the connector ran, which is one
@@ -175,12 +190,14 @@ ${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{windo
 # the other half of the fix: "mrm claude" finds the Claude pane in the MRM
 # window even though neither the pane title nor its path says MRM.
 TREE_AWK='
-function emit(key, prefix, colour, icon, label, anc, meta,   c, g, n) {
+function emit(key, prefix, colour, icon, label, anc, meta, state,   c, g, n, d) {
   c = (key == srcpane) ? ccur : colour
   g = (key in mark) ? (cmark gmark " " coff) : "  "
+  d = (state == "waiting") ? (cwait gstate " " coff) \
+    : (state == "done")    ? (cdone gstate " " coff) : "  "
   n = searching ? "    " : sprintf("%3d ", ++nr)
   printf "%s\t%s\n", key,
-         cmuted n coff g cmuted prefix c icon label coff canc anc cmuted meta coff
+         cmuted n coff g d cmuted prefix c icon label coff canc anc cmuted meta coff
 }
 BEGIN {
   FS = "\t"
@@ -190,7 +207,7 @@ BEGIN {
   tee = "\342\224\234\342\224\200 "; elbow = "\342\224\224\342\224\200 "
   pipe = "\342\224\202  "; blank = "   "
   isess = "\357\210\263 "; iwin = "\357\213\220 "; ipane = "\357\204\240 "
-  gmark = "\357\200\214"
+  gmark = "\357\200\214"; gstate = "\342\227\217"
   # A session row has no ancestor to name, but still owes the column its width
   # while searching, or its meta would sit left of everything else there.
   noanc = sprintf("%28s", "")
@@ -200,7 +217,7 @@ BEGIN {
     sess = $1; swins = $2 + 0; wseen = 0; win = ""
     skey = "s:" sess
     sshut = (!searching && (skey in fold))
-    emit(skey, sshut ? right : down, csess, isess, $3, searching ? noanc : "", $4)
+    emit(skey, sshut ? right : down, csess, isess, $3, searching ? noanc : "", $4, $16)
   }
   if (sshut) next
 
@@ -208,7 +225,7 @@ BEGIN {
   if (wkey != win) {
     win = wkey; wpanes = $6 + 0; pseen = 0; wseen++
     wlast = (wseen == swins)
-    emit(wkey, wlast ? elbow : tee, cwin, iwin, $7, searching ? $12 : "", $8)
+    emit(wkey, wlast ? elbow : tee, cwin, iwin, $7, searching ? $12 : "", $8, $15)
     wshut = (!searching && (wkey in fold))
     trunk = wlast ? blank : pipe
   }
@@ -216,7 +233,7 @@ BEGIN {
 
   pseen++
   emit("p:" $9, trunk (pseen == wpanes ? elbow : tee), cpane, ipane, $10,
-       searching ? $13 : "", $11)
+       searching ? $13 : "", $11, $14)
 }'
 
 list() {
@@ -225,6 +242,7 @@ list() {
           -v srcpane="p:$SRC_PANE" \
           -v csess="$C_BLUE$C_BOLD" -v cwin="$C_FG$C_BOLD" -v cpane="$C_FG" \
           -v cmuted="$C_MUTED" -v ccur="$C_GREEN" -v cmark="$C_YELLOW" \
+          -v cwait="$C_YELLOW" -v cdone="$C_GREEN" \
           -v canc="$C_BLUE" -v coff="$C_OFF" "$TREE_AWK"
 }
 
