@@ -45,14 +45,14 @@ cd ~/Developer/Config
 
 This creates symlinks for:
 
-| Target | Symlink |
-|---|---|
-| `.zshenv` | `~/.zshenv` |
-| `.tmux.conf` | `~/.tmux.conf` |
-| `.config/nvim` | `~/.config/nvim` |
-| `.config/zsh` | `~/.config/zsh` |
-| `.config/ghostty` | `~/.config/ghostty` |
-| `.config/tmux` | `~/.config/tmux` |
+| Target            | Symlink                                                                             |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| `.zshenv`         | `~/.zshenv`                                                                         |
+| `.tmux.conf`      | `~/.tmux.conf`                                                                      |
+| `.config/nvim`    | `~/.config/nvim`                                                                    |
+| `.config/zsh`     | `~/.config/zsh`                                                                     |
+| `.config/ghostty` | `~/.config/ghostty`                                                                 |
+| `.config/tmux`    | `~/.config/tmux`                                                                    |
 | `.config/lazygit` | `~/.config/lazygit` (+ `~/Library/Application Support/lazygit/config.yml` on macOS) |
 
 On macOS, lazygit ignores `~/.config` and reads from
@@ -69,7 +69,7 @@ effect without a manual `prefix + I` or server restart.
 ```
 .zshenv                        # Points ZDOTDIR to ~/.config/zsh
 .tmux.conf                     # Tmux config (prefix: Ctrl+Space)
-.claude/                       # Claude Code settings
+.claude/                       # Claude Code skills, settings, tmux/statusline scripts
 .config/
   ghostty/config               # Terminal (One Dark Two, JetBrainsMono Nerd Font)
   lazygit/config.yml           # Lazygit (review-focused layout, delta pager, pink/cyan theme)
@@ -84,12 +84,12 @@ keybinds.ahk                   # AutoHotKey remaps (Windows)
 
 ## Key Aliases
 
-| Alias | Command |
-|---|---|
-| `lg` | `lazygit` |
-| `cc` | `claude` |
-| `ref` | Re-source `.zshrc` |
-| `zrc` | Edit `.zshrc` in nvim |
-| `zal` | Edit `aliasrc` in nvim |
-| `wp` | `cd ~/Developer` |
-| `ts` | Toggle the Tailscale VPN + macOS sleep together (`ts on` / `ts off` / `ts status`) |
+| Alias | Command                                                                            |
+| ----- | ---------------------------------------------------------------------------------- |
+| `lg`  | `lazygit`                                                                          |
+| `cc`  | `claude`                                                                           |
+| `ref` | Re-source `.zshrc`                                                                 |
+| `zrc` | Edit `.zshrc` in nvim                                                              |
+| `zal` | Edit `aliasrc` in nvim                                                             |
+| `wp`  | `cd ~/Developer`                                                                   |
+| `ts`  | Toggle the Tailscale VPN + macOS sleep together (`ts on` / `ts off` / `ts status`) |
