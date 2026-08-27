@@ -120,7 +120,7 @@ fi
 # filtered away. So each row also carries the names of its ancestors, ready to
 # print when there is no tree left to read them off.
 ROW_FMT="#{session_name}${TAB}#{session_windows}${TAB}#{p46:#{=45:#{session_name}}}${TAB}#{session_windows} window#{?#{==:#{session_windows},1},,s}\
-${TAB}#{window_index}${TAB}#{window_panes}${TAB}#{p45:#{=44:#{window_index}: #{window_name}}}${TAB}#{window_panes} pane#{?#{==:#{window_panes},1},,s}\
+${TAB}#{window_index}${TAB}#{window_panes}${TAB}#{p45:#{=44:#{window_name}}}${TAB}#{window_panes} pane#{?#{==:#{window_panes},1},,s}\
 ${TAB}#{pane_id}${TAB}#{p42:#{=41:#{?#{==:#{pane_title},#{host}},#{pane_current_command},#{pane_title}}}}${TAB}#{s|^$HOME|~|:pane_current_path}\
 ${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{window_index}: #{window_name}}}"
 
@@ -140,10 +140,22 @@ ${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{windo
 # connector is three display cells wide, which is what keeps the column
 # padding tmux already did in the format string honest.
 #
-# Two fixed-width columns sit in front of every label: a two-cell mark gutter
-# and a two-cell type icon. Both are the same width on every row whatever it
-# holds, so the label padding tmux already did in ROW_FMT still lines the meta
-# column up; only a *varying* width would have to be paid for there.
+# Every row is numbered, and `:N` moves the cursor to row N. The number is the
+# row's position in the list, not any tmux index: a window index only addresses
+# a window inside its own session, so it cannot name the row you are looking at
+# here — which is why the window label no longer carries one. Being a position
+# also means the numbers renumber as folds open and close, which is the point,
+# since what you type is always what you can see.
+#
+# They are drawn only while the query is empty, the same rule as folds and for
+# the same reason: fzf filters the list after awk has numbered it, so under a
+# search the numbers on screen would no longer be the positions they name.
+#
+# Three fixed-width columns sit in front of every label: a four-cell number
+# gutter, a two-cell mark gutter and a two-cell type icon. All three are the
+# same width on every row whatever it holds, so the label padding tmux already
+# did in ROW_FMT still lines the meta column up; only a *varying* width would
+# have to be paid for there.
 #
 # The icon is what tells a window row from a pane row. They were both plain fg
 # text before, distinguishable only by how deep the connector ran, which is one
@@ -163,11 +175,12 @@ ${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{windo
 # the other half of the fix: "mrm claude" finds the Claude pane in the MRM
 # window even though neither the pane title nor its path says MRM.
 TREE_AWK='
-function emit(key, prefix, colour, icon, label, anc, meta,   c, g) {
+function emit(key, prefix, colour, icon, label, anc, meta,   c, g, n) {
   c = (key == srcpane) ? ccur : colour
   g = (key in mark) ? (cmark gmark " " coff) : "  "
-  printf "%s\t%s%s%s%s%s%s%s%s%s%s%s%s\n",
-         key, g, cmuted, prefix, c, icon, label, coff, canc, anc, cmuted, meta, coff
+  n = searching ? "    " : sprintf("%3d ", ++nr)
+  printf "%s\t%s\n", key,
+         cmuted n coff g cmuted prefix c icon label coff canc anc cmuted meta coff
 }
 BEGIN {
   FS = "\t"
@@ -451,8 +464,25 @@ save_pos() {
   printf 'pos(%d)' "$(($2 + 1 - _off))" > "$POS_FILE"
 }
 
+# `:N` is the same cursor handoff read the other way round: nothing is being
+# mutated, so there is no position to work out — the number typed *is* the
+# position. It goes to the same file so the same after-act transform applies it.
+#
+# execute() rather than execute-silent(), for the reason the mutation prompts
+# use it: the child needs the terminal to draw its prompt and read a line. A
+# blank or non-numeric answer writes nothing, and an empty transform leaves the
+# cursor where it was — so backing out of the prompt costs nothing.
+goto() {
+  ask "Go to row: " || exit 0
+  case $REPLY_ in
+    ''|*[!0-9]*) exit 0 ;;
+  esac
+  printf 'pos(%d)' "$REPLY_" > "$POS_FILE"
+}
+
 case ${1:-} in
   list)    list "$2"; exit 0 ;;
+  goto)    goto; exit 0 ;;
   after-act) cat "$POS_FILE" 2>/dev/null; rm -f "$POS_FILE"; exit 0 ;;
   act)     act "$2" "$3" "$4"; exit 0 ;;
   preview) tmux capture-pane -ep -t "$(target "$2")" 2>/dev/null; exit 0 ;;
@@ -477,11 +507,10 @@ SRC_SESSION=$(tmux display-message -p '#{session_name}')
 export SRC_PANE SRC_SESSION
 [ -n "$SRC_PANE" ] || die "could not determine the current tmux pane."
 
-# Folds are reseeded on every open rather than persisted: the current session
-# expanded and the rest collapsed is the useful default every time, and a fold
-# you set is only ever meant to last as long as the popup is up.
-tmux list-sessions -F 's:#{session_name}' 2>/dev/null \
-  | grep -vxF "s:$SRC_SESSION" > "$FOLD_FILE"
+# Folds are reseeded on every open rather than persisted: the popup opens on the
+# whole tree — the question it answers is what is open everywhere, not just here
+# — and a fold you set is only ever meant to last as long as the popup is up.
+: > "$FOLD_FILE"
 # Marks are reseeded empty for the same reason, and more strongly: a mark left
 # over from a previous popup would name a row you have since forgotten about,
 # and M would move it.
@@ -509,7 +538,7 @@ prompt="$SRC_SESSION > "
 # in normal mode would silently land in the query and start filtering, so the
 # mode would only be as real as your memory of which letters do something.
 # Bound to ignore, normal mode is inert except where it is not.
-VIM_NAV='j,k,g,G,d,u'
+VIM_NAV='j,k,g,G,d,u,:'
 VIM_MODE='i,a,/,q'
 VIM_ACT='h,l,n,r,x,p,m,M,U'
 
@@ -540,7 +569,13 @@ P_NORMAL="$C_YELLOW$prompt"
 # Folding is the exception: it is h/l only, with no ctrl alias. A tree wants a
 # direction rather than a toggle — h always closes, l always opens, whatever
 # the row is doing now — and there is no unmodified pair to alias it to.
-header='j/k move  h/l fold  g/G ends  d/u page  n new  r rename  x kill  p preview  q quit
+#
+# `:` clears the query and rebuilds before prompting. With an empty query, which
+# is the only state that shows numbers, both are no-ops; pressed under a search
+# they put back the list the numbers were counted over, so the answer means what
+# it says rather than landing on the Nth surviving match. reload-sync rather
+# than leaving it to the change event, so the list is back before the prompt.
+header='j/k move  h/l fold  :N row  g/G ends  d/u page  n new  r rename  x kill  p preview  q quit
 m mark  M move marked here  U unmark all   i or / search (esc back)   ^j ^k ^n ^r ^x ^t ^g   ↵ jump'
 
 out=$(list | fzf \
@@ -559,6 +594,7 @@ out=$(list | fzf \
   --bind="a:unbind($MODAL_KEYS)+change-prompt($P_INSERT)" \
   --bind="/:unbind($MODAL_KEYS)+change-prompt($P_INSERT)" \
   --bind='j:down,k:up,g:first,G:last,d:half-page-down,u:half-page-up' \
+  --bind="::clear-query+reload-sync('$SELF' list)+execute('$SELF' goto)+transform('$SELF' after-act)" \
   --bind='q:abort,p:toggle-preview' \
   --bind="$dead_binds" \
   --bind="n:execute('$SELF' act new {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
