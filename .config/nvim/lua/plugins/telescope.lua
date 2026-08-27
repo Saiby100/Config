@@ -406,8 +406,14 @@ return {
           sort_mru = true,
           -- Telescope ships actions.delete_buffer but binds nothing to it, so
           -- wire dd (normal) / <C-d> (insert) to close the highlighted buffer.
+          -- delete_buffer acts on the multi-selection when there is one, so m
+          -- (mark, then step down, the way <Tab> already does) turns dd into
+          -- "close all of these" without a second key to learn.
           mappings = {
-            n = { ["dd"] = actions.delete_buffer },
+            n = {
+              ["dd"] = actions.delete_buffer,
+              ["m"] = actions.toggle_selection + actions.move_selection_worse,
+            },
             i = { ["<C-d>"] = actions.delete_buffer },
           },
         },
