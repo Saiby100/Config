@@ -1,10 +1,6 @@
 #!/bin/sh
 # One fzf popup replacing choose-tree entirely (prefix + w).
 #
-#   tree.sh              (prefix + w)  browse everything, enter jumps
-#   tree.sh grab         (prefix + g)  same list, enter pulls a pane to me
-#   tree.sh send         (prefix + G)  same list, enter pushes my pane there
-#
 # Every session, window and pane in the server is one row of a tree, and fzf
 # matches incrementally across the whole row — session name, window name, pane
 # title and path at once. choose-tree can draw the same hierarchy but cannot
@@ -12,9 +8,17 @@
 # needed a separate binding and a separate prompt. Here they are hotkeys on the
 # row already under the cursor.
 #
+# Enter jumps to the row under the cursor. Moving things around is a mark and a
+# destination instead: m marks rows, M moves everything marked into the row the
+# cursor is on. That replaced the old `grab` and `send` modes (prefix + g and
+# prefix + G), which were the same list opened twice with a different verb on
+# enter and could only ever move one pane, always relative to the pane you
+# happened to be sitting in. Marks name both ends explicitly, so the popup no
+# longer needs a mode at all.
+#
 # The script re-enters itself: fzf's reload/execute/preview bindings all call
 # "$0" with a mode argument. Modes are `list`, `act <verb> <key>` and
-# `preview <key>`; no argument (or jump/grab/send) is the interactive entry.
+# `preview <key>`; no argument is the interactive entry.
 
 # display-popup runs a non-login sh whose PATH comes from the tmux *server's*
 # environment, which is whatever the first client happened to have. Homebrew's
@@ -55,6 +59,7 @@ case $SELF in
 esac
 TAB=$(printf '\t')
 FOLD_FILE="${TMPDIR:-/tmp}/tmux-tree-folds"
+MARK_FILE="${TMPDIR:-/tmp}/tmux-tree-marks"
 
 # --- Palette ---------------------------------------------------------------
 # fzf does not expand tmux formats, so the onedark user options from
@@ -107,9 +112,17 @@ fi
 # Claude Code keeps pane_title set to what the session is about ("Obsidian
 # vault organization"), which identifies a pane far better than the window
 # name or the command (Claude reports a version string, not "claude").
+#
+# The last two fields are the ancestry column, drawn only while searching (see
+# emit below). A search filters the tree down to the matching rows, and a pane
+# row on its own says nothing about which session or window it came out of —
+# the connector to its parent is still drawn, but the parent itself has been
+# filtered away. So each row also carries the names of its ancestors, ready to
+# print when there is no tree left to read them off.
 ROW_FMT="#{session_name}${TAB}#{session_windows}${TAB}#{p46:#{=45:#{session_name}}}${TAB}#{session_windows} window#{?#{==:#{session_windows},1},,s}\
 ${TAB}#{window_index}${TAB}#{window_panes}${TAB}#{p45:#{=44:#{window_index}: #{window_name}}}${TAB}#{window_panes} pane#{?#{==:#{window_panes},1},,s}\
-${TAB}#{pane_id}${TAB}#{p42:#{=41:#{?#{==:#{pane_title},#{host}},#{pane_current_command},#{pane_title}}}}${TAB}#{s|^$HOME|~|:pane_current_path}"
+${TAB}#{pane_id}${TAB}#{p42:#{=41:#{?#{==:#{pane_title},#{host}},#{pane_current_command},#{pane_title}}}}${TAB}#{s|^$HOME|~|:pane_current_path}\
+${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{window_index}: #{window_name}}}"
 
 # --- Building the list -----------------------------------------------------
 # A fold hides rows, and a hidden row cannot be fuzzy-matched — which would
@@ -126,24 +139,55 @@ ${TAB}#{pane_id}${TAB}#{p42:#{=41:#{?#{==:#{pane_title},#{host}},#{pane_current_
 # from session_windows and window_panes rather than a lookahead. Every
 # connector is three display cells wide, which is what keeps the column
 # padding tmux already did in the format string honest.
+#
+# Two fixed-width columns sit in front of every label: a two-cell mark gutter
+# and a two-cell type icon. Both are the same width on every row whatever it
+# holds, so the label padding tmux already did in ROW_FMT still lines the meta
+# column up; only a *varying* width would have to be paid for there.
+#
+# The icon is what tells a window row from a pane row. They were both plain fg
+# text before, distinguishable only by how deep the connector ran, which is one
+# glyph of difference three columns to the left of where you are reading. The
+# colours differ now too (windows bold), but the icon is the part that reads at
+# a glance. Glyphs are Nerd Font — ghostty is set to JetBrainsMono Nerd Font,
+# and tmux inherits it.
+#
+# The ancestry column sits between the label and the meta, not in front of the
+# row: in front it would have to be part of the prefix, whose width is what the
+# per-depth label padding above is compensating for, and a session name is not
+# a fixed width. After the label, where every row is already flush, a column of
+# tmux-padded ancestry keeps the meta flush too. It is blue rather than muted
+# so it reads as the session/window rows it names rather than as more meta.
+#
+# fzf matches the display column, so the ancestry is matched as well — which is
+# the other half of the fix: "mrm claude" finds the Claude pane in the MRM
+# window even though neither the pane title nor its path says MRM.
 TREE_AWK='
-function emit(key, prefix, colour, label, meta,   c) {
+function emit(key, prefix, colour, icon, label, anc, meta,   c, g) {
   c = (key == srcpane) ? ccur : colour
-  printf "%s\t%s%s%s%s%s%s%s%s\n", key, cmuted, prefix, c, label, coff, cmuted, meta, coff
+  g = (key in mark) ? (cmark gmark " " coff) : "  "
+  printf "%s\t%s%s%s%s%s%s%s%s%s%s%s%s\n",
+         key, g, cmuted, prefix, c, icon, label, coff, canc, anc, cmuted, meta, coff
 }
 BEGIN {
   FS = "\t"
   while ((getline line < foldfile) > 0) fold[line] = 1
+  while ((getline line < markfile) > 0) mark[line] = 1
   down = "\342\226\276 "; right = "\342\226\270 "
   tee = "\342\224\234\342\224\200 "; elbow = "\342\224\224\342\224\200 "
   pipe = "\342\224\202  "; blank = "   "
+  isess = "\357\210\263 "; iwin = "\357\213\220 "; ipane = "\357\204\240 "
+  gmark = "\357\200\214"
+  # A session row has no ancestor to name, but still owes the column its width
+  # while searching, or its meta would sit left of everything else there.
+  noanc = sprintf("%28s", "")
 }
 {
   if ($1 != sess) {
     sess = $1; swins = $2 + 0; wseen = 0; win = ""
     skey = "s:" sess
     sshut = (!searching && (skey in fold))
-    emit(skey, sshut ? right : down, csess, $3, $4)
+    emit(skey, sshut ? right : down, csess, isess, $3, searching ? noanc : "", $4)
   }
   if (sshut) next
 
@@ -151,26 +195,29 @@ BEGIN {
   if (wkey != win) {
     win = wkey; wpanes = $6 + 0; pseen = 0; wseen++
     wlast = (wseen == swins)
-    emit(wkey, wlast ? elbow : tee, cwin, $7, $8)
+    emit(wkey, wlast ? elbow : tee, cwin, iwin, $7, searching ? $12 : "", $8)
     wshut = (!searching && (wkey in fold))
     trunk = wlast ? blank : pipe
   }
   if (wshut) next
 
   pseen++
-  emit("p:" $9, trunk (pseen == wpanes ? elbow : tee), cwin, $10, $11)
+  emit("p:" $9, trunk (pseen == wpanes ? elbow : tee), cpane, ipane, $10,
+       searching ? $13 : "", $11)
 }'
 
 list() {
   tmux list-panes -a -F "$ROW_FMT" 2>/dev/null \
-    | awk -v searching="$1" -v foldfile="$FOLD_FILE" -v srcpane="p:$SRC_PANE" \
-          -v csess="$C_BLUE$C_BOLD" -v cwin="$C_FG" -v cmuted="$C_MUTED" \
-          -v ccur="$C_GREEN" -v coff="$C_OFF" "$TREE_AWK"
+    | awk -v searching="$1" -v foldfile="$FOLD_FILE" -v markfile="$MARK_FILE" \
+          -v srcpane="p:$SRC_PANE" \
+          -v csess="$C_BLUE$C_BOLD" -v cwin="$C_FG$C_BOLD" -v cpane="$C_FG" \
+          -v cmuted="$C_MUTED" -v ccur="$C_GREEN" -v cmark="$C_YELLOW" \
+          -v canc="$C_BLUE" -v coff="$C_OFF" "$TREE_AWK"
 }
 
 # --- Targets ---------------------------------------------------------------
 # A tmux target string for any key. A session or window key resolves to its
-# active pane, which is what makes preview and grab work on a collapsed row
+# active pane, which is what makes preview and M work on a collapsed row
 # without the cursor having to reach a pane.
 target() {
   case $1 in
@@ -190,6 +237,89 @@ ask() {
   printf '%s' "$1" >&2
   read -r REPLY_ || return 1
   [ -n "$REPLY_" ]
+}
+
+pause() {
+  printf '\n\nPress enter to continue.'
+  read -r _
+}
+
+# --- Moving marked rows -----------------------------------------------------
+# m marks a row; M drops everything marked into the row the cursor is on. That
+# is the whole of what used to be `grab` and `send`: those could only move the
+# one pane you were sitting in, to or from one place, and needed two bindings
+# and two modes to say which direction. A mark names the source and the cursor
+# names the destination, so one key covers both directions and any number of
+# rows at once.
+#
+# A pane can live in any window, so it goes to the window holding the chosen
+# row. A window has no such freedom — a window cannot sit inside another window
+# — so a marked window takes the chosen row's *session* instead. That is what
+# makes M on a pane row meaningful for a marked window rather than an error: it
+# reads as "the session that pane is in".
+#
+# Rows already at their destination are skipped rather than refused, so a mixed
+# bag of marks does as much as it can; only real failures are reported.
+#
+# join-pane names its source with -s. Without it tmux prefers the *marked*
+# pane — tmux's own select-pane -m mark, which the status-bar drag bindings in
+# .tmux.conf set — and a leftover one there would move a pane nobody chose. -d
+# on both moves keeps focus where it is: the point of arranging from a list is
+# that you are arranging, not following.
+move_marked() {
+  dst=$1
+  if [ ! -s "$MARK_FILE" ]; then
+    printf 'Nothing marked. Press m on a row first.'
+    pause
+    return
+  fi
+
+  # One lookup, not two: the session is the window target minus its index.
+  # Trimming from the right rather than the left is what keeps a session name
+  # containing a colon intact. The pattern test is the liveness check —
+  # display-message exits 0 on a target that no longer exists and prints a
+  # half-empty answer, so the exit status is no use here.
+  dst_win=$(tmux display-message -p -t "$dst" '#{session_name}:#{window_index}' 2>/dev/null)
+  case $dst_win in
+    ?*:[0-9]*) dst_sess=${dst_win%:*} ;;
+    *) printf 'That row is gone.'; pause; return ;;
+  esac
+
+  moved=0 errs=''
+  while IFS= read -r mk; do
+    case $mk in
+      p:*)
+        src=${mk#p:}
+        here=$(tmux display-message -p -t "$src" '#{session_name}:#{window_index}' 2>/dev/null)
+        [ -n "$here" ] || { errs="$errs
+  $src is gone."; continue; }
+        [ "$here" != "$dst_win" ] || continue
+        if out=$(tmux join-pane -dh -s "$src" -t "$dst_win" 2>&1); then
+          moved=$((moved + 1))
+        else
+          errs="$errs
+  $src: $out"
+        fi
+        ;;
+      w:*)
+        # The key is w:<session>:<index>, so stripping "w:" leaves a target
+        # window tmux takes as-is.
+        src=${mk#w:}
+        [ "${src%%:*}" != "$dst_sess" ] || continue
+        # -t "<session>:" with no index is how tmux is asked for the next free
+        # one; naming an index would collide with whatever already holds it.
+        if out=$(tmux move-window -d -s "$src" -t "$dst_sess:" 2>&1); then
+          moved=$((moved + 1))
+        else
+          errs="$errs
+  $src: $out"
+        fi
+        ;;
+    esac
+  done < "$MARK_FILE"
+
+  : > "$MARK_FILE"
+  [ -z "$errs" ] || { printf 'Moved %d.%s' "$moved" "$errs"; pause; }
 }
 
 # --- Mutations -------------------------------------------------------------
@@ -268,6 +398,21 @@ act() {
         p:*) tmux kill-pane -t "$tgt" ;;
       esac
       ;;
+    mark)
+      # Same toggle-in-a-file shape as the folds above, and the same reason the
+      # mv is unconditional: grep exits 1 when it selects no lines, which is
+      # exactly the unmark-the-last-mark case, and the redirection has already
+      # written the file by then.
+      touch "$MARK_FILE"
+      if grep -qxF "$key" "$MARK_FILE"; then
+        grep -vxF "$key" "$MARK_FILE" > "$MARK_FILE.tmp"
+        mv "$MARK_FILE.tmp" "$MARK_FILE"
+      else
+        printf '%s\n' "$key" >> "$MARK_FILE"
+      fi
+      ;;
+    unmark) : > "$MARK_FILE" ;;
+    move)   move_marked "$tgt" ;;
   esac
 }
 
@@ -293,10 +438,15 @@ POS_FILE="${TMPDIR:-/tmp}/tmux-tree-pos"
 # +1 makes it the 1-based position fzf's pos() wants. The exception is h on a
 # pane, which closes the window above it: that pane sits exactly pane_index
 # rows below its window row, panes being listed in index order.
+# Marking is the other exception, in the opposite direction: marking a run of
+# panes is the common case, so m steps down a row afterwards the way it does in
+# the Telescope buffer picker. fzf clamps a pos() past the end, so the last row
+# needs no special case.
 save_pos() {
   _off=0
   case $3:$1 in
     collapse:p:*) _off=$(tmux display-message -p -t "${1#p:}" '#{pane_index}' 2>/dev/null) || _off=0 ;;
+    mark:*)       _off=-1 ;;
   esac
   printf 'pos(%d)' "$(($2 + 1 - _off))" > "$POS_FILE"
 }
@@ -316,8 +466,6 @@ command -v fzf >/dev/null 2>&1 || die "fzf not found on PATH.
 PATH was:
 $PATH"
 
-mode=${1:-jump}
-
 # Resolved here rather than passed in from the binding, because display-popup
 # does NOT format-expand its shell-command — passing '#{pane_id}' handed the
 # script the literal placeholder. Asking tmux from inside the popup works: the
@@ -325,9 +473,8 @@ mode=${1:-jump}
 # pane, not against the popup itself. Exported so the reload/execute children
 # see the same answers.
 SRC_PANE=$(tmux display-message -p '#{pane_id}')
-SRC_WINDOW=$(tmux display-message -p '#{session_name}:#{window_index}')
 SRC_SESSION=$(tmux display-message -p '#{session_name}')
-export SRC_PANE SRC_WINDOW SRC_SESSION
+export SRC_PANE SRC_SESSION
 [ -n "$SRC_PANE" ] || die "could not determine the current tmux pane."
 
 # Folds are reseeded on every open rather than persisted: the current session
@@ -335,13 +482,13 @@ export SRC_PANE SRC_WINDOW SRC_SESSION
 # you set is only ever meant to last as long as the popup is up.
 tmux list-sessions -F 's:#{session_name}' 2>/dev/null \
   | grep -vxF "s:$SRC_SESSION" > "$FOLD_FILE"
+# Marks are reseeded empty for the same reason, and more strongly: a mark left
+# over from a previous popup would name a row you have since forgotten about,
+# and M would move it.
+: > "$MARK_FILE"
 rm -f "$POS_FILE"
 
-case $mode in
-  send) prompt="send $SRC_PANE to > " ;;
-  grab) prompt="grab into $SRC_WINDOW > " ;;
-  *)    prompt="$SRC_SESSION > " ;;
-esac
+prompt="$SRC_SESSION > "
 
 # --- Modal editing ---------------------------------------------------------
 # fzf has no modes, but it has unbind() and rebind(), and that is enough to
@@ -364,12 +511,12 @@ esac
 # Bound to ignore, normal mode is inert except where it is not.
 VIM_NAV='j,k,g,G,d,u'
 VIM_MODE='i,a,/,q'
-VIM_ACT='h,l,n,r,x,p'
+VIM_ACT='h,l,n,r,x,p,m,M,U'
 
 dead_keys=''
 dead_binds=''
-for k in b c e f m o s t v w y z space \
-         A B C D E F H I J K L M N O P Q R S T U V W X Y Z \
+for k in b c e f o s t v w y z space \
+         A B C D E F H I J K L N O P Q R S T V W X Y Z \
          0 1 2 3 4 5 6 7 8 9; do
   dead_keys="$dead_keys,$k"
   dead_binds="$dead_binds,$k:ignore"
@@ -384,17 +531,17 @@ dead_binds=${dead_binds#,}
 P_INSERT="$prompt"
 P_NORMAL="$C_YELLOW$prompt"
 
-# ctrl-based keys work in both modes, so nothing has to be remembered twice —
-# normal mode adds unshifted aliases for the ones that stay in the popup, and
-# leaves send and grab on ^s/^g because both close the popup and fzf reports a
-# closing key through --expect, which is not a binding and so cannot be
-# rebound per mode.
+# ctrl-based keys work in both modes, so nothing has to be remembered twice:
+# normal mode adds unshifted aliases, and everything that stays in the popup
+# has a ctrl form reachable from a search too. Marking during a search is the
+# reason that matters here — a search is exactly how you reach the rows you
+# want to mark, and having to leave it for each one would undo the point.
 #
 # Folding is the exception: it is h/l only, with no ctrl alias. A tree wants a
 # direction rather than a toggle — h always closes, l always opens, whatever
 # the row is doing now — and there is no unmodified pair to alias it to.
 header='j/k move  h/l fold  g/G ends  d/u page  n new  r rename  x kill  p preview  q quit
-i or / to search (esc back)   ^j ^k ^n ^r ^x  ^s send  ^g grab   ↵ act'
+m mark  M move marked here  U unmark all   i or / search (esc back)   ^j ^k ^n ^r ^x ^t ^g   ↵ jump'
 
 out=$(list | fzf \
   --ansi \
@@ -405,7 +552,7 @@ out=$(list | fzf \
   --prompt="$P_NORMAL" \
   --header="$header" \
   --header-first \
-  --expect=enter,ctrl-s,ctrl-g \
+  --expect=enter \
   --bind='ctrl-j:down,ctrl-k:up' \
   --bind="esc:rebind($MODAL_KEYS)+change-prompt($P_NORMAL)" \
   --bind="i:unbind($MODAL_KEYS)+change-prompt($P_INSERT)" \
@@ -419,12 +566,17 @@ out=$(list | fzf \
   --bind="x:execute('$SELF' act kill {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="h:execute-silent('$SELF' act collapse {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="l:execute-silent('$SELF' act expand {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="m:execute-silent('$SELF' act mark {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="U:execute-silent('$SELF' act unmark {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="M:execute('$SELF' act move {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind='?:toggle-preview' \
   --bind="change:reload('$SELF' list {q})" \
   --bind='alt-j:preview-down,alt-k:preview-up' \
   --bind="ctrl-n:execute('$SELF' act new {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="ctrl-r:execute('$SELF' act rename {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --bind="ctrl-x:execute('$SELF' act kill {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="ctrl-t:execute-silent('$SELF' act mark {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
+  --bind="ctrl-g:execute('$SELF' act move {1} {n})+reload-sync('$SELF' list {q})+transform('$SELF' after-act)" \
   --preview="'$SELF' preview {1}" \
   --preview-window=right,45%)
 rc=$?
@@ -438,40 +590,16 @@ case "$rc" in
   *)      die "fzf exited with status $rc." ;;
 esac
 
-pressed=$(printf '%s\n' "$out" | sed -n 1p)
+# Line 1 is the --expect key, line 2 the chosen row.
 key=$(printf '%s\n' "$out" | sed -n 2p | cut -d"$TAB" -f1)
 [ -n "$key" ] || exit 0
 tgt=$(target "$key")
 
-# Enter means whichever job the popup was opened for; ctrl-s and ctrl-g reach
-# the other two without reopening it.
-case $pressed in
-  ctrl-s) action=send ;;
-  ctrl-g) action=grab ;;
-  *)      action=$mode ;;
-esac
-
-case $action in
-  send)
-    # -s names the source explicitly. Without it join-pane silently prefers
-    # the *marked* pane over the current one, and the status-bar drag bindings
-    # in .tmux.conf traffic in marks — so a leftover mark would move the wrong
-    # pane. -d is what makes this "send" rather than "move with": without it
-    # tmux follows the pane into the target and you lose the window you were
-    # working in, which is the whole point.
-    dst=$(tmux display-message -p -t "$tgt" '#{session_name}:#{window_index}')
-    [ "$dst" != "$SRC_WINDOW" ] || die "that pane is already in this window."
-    tmux join-pane -dh -s "$SRC_PANE" -t "$dst" ;;
-  grab)
-    src=$(tmux display-message -p -t "$tgt" '#{pane_id}')
-    [ "$src" != "$SRC_PANE" ] || die "that is the pane you are in."
-    tmux join-pane -h -s "$src" -t "$SRC_PANE" ;;
-  *)
-    # select-window resolves a pane target to its containing window, and
-    # select-pane unzooms that window on its own if it was zoomed on some
-    # other pane — so the row you picked is always the one you land on and can
-    # see. switch-client first, because the target may be another session.
-    tmux switch-client -t "$(tmux display-message -p -t "$tgt" '#{session_name}')"
-    tmux select-window -t "$tgt"
-    case $key in p:*) tmux select-pane -t "$tgt" ;; esac ;;
-esac
+# Enter is the only key that closes the popup with a row: everything else acts
+# in place and reloads. select-window resolves a pane target to its containing
+# window, and select-pane unzooms that window on its own if it was zoomed on
+# some other pane — so the row you picked is always the one you land on and can
+# see. switch-client first, because the target may be another session.
+tmux switch-client -t "$(tmux display-message -p -t "$tgt" '#{session_name}')"
+tmux select-window -t "$tgt"
+case $key in p:*) tmux select-pane -t "$tgt" ;; esac
