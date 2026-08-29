@@ -299,14 +299,21 @@ function _G._lazygit_fixup(line)
 			return
 		end
 		local file_buf = vim.api.nvim_win_get_buf(win)
+		-- `--remote` uses :drop semantics: if the file was *already* open in a real
+		-- window it jumps there and never touches the float, so the buffer we just
+		-- read is lazygit's own terminal. Only re-home the buffer when the float
+		-- actually got hijacked — otherwise we'd display the terminal in the editor.
+		local hijacked = file_buf ~= lazygit.buf
 		-- The float swapped to the file buffer; put the lazygit terminal back so
 		-- reopening the float lands on lazygit, not this file.
-		if vim.api.nvim_buf_is_valid(lazygit.buf) then
+		if hijacked and vim.api.nvim_buf_is_valid(lazygit.buf) then
 			vim.api.nvim_win_set_buf(win, lazygit.buf)
 		end
 		vim.api.nvim_win_hide(win) -- hide, keep lazygit running
 		lazygit.win = -1
-		vim.api.nvim_set_current_buf(file_buf) -- show the file in a real window
+		if hijacked then
+			vim.api.nvim_set_current_buf(file_buf) -- show the file in a real window
+		end
 		if line and line > 0 then
 			pcall(vim.api.nvim_win_set_cursor, 0, { line, 0 })
 		end
