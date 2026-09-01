@@ -29,10 +29,10 @@ vim.api.nvim_create_autocmd("TermOpen", {
 })
 
 -- Mirror tmux's active-pane background tint inside Neovim. tmux sets
--- window-active-style "bg=#283040" (.tmux.conf), but that can't show through
+-- window-active-style "bg=#31353f" (.tmux.conf), but that can't show through
 -- here because Neovim paints its own background over every cell. So react to
 -- the forwarded focus events (focus-events on) and retint ourselves.
-local active_bg = "#283040" -- tmux window-active-style
+local active_bg = "#31353f" -- tmux window-active-style
 local inactive_bg = "#282c34" -- onedark "dark" default background
 local function set_pane_bg(color)
   for _, group in ipairs({ "Normal", "NormalNC", "SignColumn", "LineNr", "EndOfBuffer" }) do
