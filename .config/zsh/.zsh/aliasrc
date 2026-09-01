@@ -26,7 +26,6 @@ alias la='ls -a'
 alias py='python3'
 alias ref='source $HOME/.config/zsh/.zshrc'
 
-#
 alias rn='mv $1 $2'
 alias cc='claude'
 alias lg='lazygit'

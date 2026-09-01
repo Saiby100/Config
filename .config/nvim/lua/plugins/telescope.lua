@@ -245,7 +245,6 @@ local function find_files(default_text)
   builtin.find_files({
     prompt_title = "Find Files  (scope :: query)",
     default_text = default_text or prefill(),
-    -- Initial listing honours the pre-filled scope.
     find_command = function()
       return files_command(dirs0, globs0)
     end,

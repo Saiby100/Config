@@ -21,7 +21,6 @@ vim.api.nvim_create_autocmd("VimResized", {
   command = "tabdo wincmd =",
 })
 
--- Exit terminal mode with <Esc><Esc>
 vim.api.nvim_create_autocmd("TermOpen", {
   callback = function(ev)
     local opts = { buffer = ev.buf, silent = true }

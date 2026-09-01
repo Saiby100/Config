@@ -1,6 +1,4 @@
 #!/bin/bash
-
-# Read JSON input from stdin
 input=$(cat)
 
 # Core fields

@@ -6,24 +6,16 @@
 #   Stop              -> done      (Claude finished its turn)
 #   UserPromptSubmit  -> clear     (you just replied, so it's your turn no longer)
 #
-# The state is recorded at three scopes at once, because three different
-# surfaces need to answer three different questions:
+# Recorded at three scopes, read by three surfaces:
 #
-#   @claude_pane_state     pane     which *pane* finished (tree.sh pane rows)
-#   @claude_state          window   which *window* finished (window-status-format,
-#                                   and tree.sh window rows)
-#   @claude_session_state  session  which *session* finished (the dot after the
-#                                   session counter in status-left, and tree.sh
-#                                   session rows)
+#   @claude_pane_state     pane     tree.sh pane rows
+#   @claude_state          window   window-status-format, tree.sh window rows
+#   @claude_session_state  session  status-left dot, tree.sh session rows
 #
 # The names differ rather than one name being set three times because pane
 # options fall back to window options, and window options to session options.
 # Sharing a name would make a pane with no state of its own read its window's
 # "done", so every sibling pane would look finished.
-#
-# Each scope is cleared when you actually look at it -- see the after-select-pane,
-# after-select-window and client-session-changed hooks in .tmux.conf. An
-# indicator for something you are already looking at carries no information.
 
 # Hooks receive JSON on stdin. We don't need it, but drain it so Claude never
 # blocks writing to a pipe nobody reads.

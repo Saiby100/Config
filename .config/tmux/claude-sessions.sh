@@ -1,30 +1,16 @@
 #!/bin/sh
 # The Claude-state dot after the session counter in status-left. Prints one
-# styled character, or nothing at all; tmux expands the #[fg=...] tag that
-# comes back from #().
+# styled character, or nothing at all; tmux expands the #[fg=...] tag.
 #
 #   yellow — some unattended session has Claude blocked on you
 #   green  — some unattended session has Claude finished its turn
-#   (none) — nothing waiting anywhere you aren't already looking
 #
 # Yellow wins when both are live: a permission prompt is holding work up, a
-# finished turn is not.
-#
-# Sessions with a client attached are skipped. You are looking at those, and
-# window-status-format already draws a per-window dot inside them — the point
-# of this one is strictly the sessions the status bar cannot show you. It also
-# means no separate clearing hook is needed for the session you are in: it is
-# attached, so it never counts.
-#
-# A #() helper rather than a #{?...} conditional in status-left because tmux's
-# format language cannot iterate over sessions. Filtering on session_attached
-# rather than taking the current session name as an argument keeps this
-# independent of format expansion inside #(), and stays correct with more than
-# one client attached to different sessions.
+# finished turn is not. Sessions with a client attached are skipped —
+# window-status-format already draws a per-window dot inside those.
 
-# display-popup/#() run with the tmux *server's* PATH, which is whatever the
-# first client happened to have. Homebrew's bin is the one that goes missing on a
-# server started from a bare env — same guard as tree.sh.
+# #() runs with the tmux *server's* PATH, which is whatever the first client
+# happened to have; Homebrew's bin is the one that goes missing.
 case ":$PATH:" in
   *:/opt/homebrew/bin:*) ;;
   *) PATH="/opt/homebrew/bin:$PATH" ;;
@@ -43,7 +29,6 @@ case "$states" in
 esac
 
 # The leading space is ours: printing nothing at all above has to leave the cap
-# exactly as it was, so the separator cannot live in status-left.
-#
-# Newline-terminated: tmux reads a #() job's output a line at a time.
+# exactly as it was, so the separator cannot live in status-left. Newline-
+# terminated: tmux reads a #() job's output a line at a time.
 printf ' #[fg=%s]%s\n' "$(tmux show-options -gv "$opt")" "$DOT"

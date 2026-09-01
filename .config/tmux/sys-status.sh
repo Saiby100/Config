@@ -2,12 +2,6 @@
 # CPU and memory load for status-right, as one styled string:
 #   󰘙 12%  󰍛 43%
 #
-# Labelled with nf-md glyphs (chip / memory chip) rather than the words CPU and
-# MEM: the status bar already spells out the session name, the window names and
-# the clock, and two more three-letter words in caps read as another name rather
-# than a gauge. Same family as the zoom and VPN glyphs already in this bar.
-#
-# Both numbers are read cheaply enough to run every status-interval (5s).
 # `top -l 1` is the obvious source for CPU on macOS but samples for about a
 # second before printing, which would stall every status redraw; ps reports the
 # kernel's own decaying per-process average and returns immediately, so the
@@ -16,10 +10,6 @@
 # Memory mirrors what Activity Monitor calls "Memory Used": active + wired +
 # compressed pages. Free/inactive pages are excluded — macOS keeps inactive
 # pages populated as cache and counting them reads as permanently full.
-#
-# White at rest rather than the @muted grey the rest of the bar idles in: these
-# are the only two numbers up there that change on their own, and a muted glyph
-# against @bg was hard to pick out at a glance.
 #
 # Colours come back out of tmux so the palette at the top of .tmux.conf stays
 # the single source of truth, and the branching happens here to keep this to one

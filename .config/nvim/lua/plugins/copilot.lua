@@ -22,7 +22,6 @@ return {
 				dismiss = "<C-]>",
 			},
 		},
-		-- Disabled: we use inline suggestions, not the panel or a cmp source.
 		panel = { enabled = false },
 	},
 }

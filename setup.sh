@@ -6,19 +6,17 @@ mkdir -p "$HOME/.config"
 ln -sf "$REPO_DIR/.zshenv" "$HOME/.zshenv"
 ln -sf "$REPO_DIR/.tmux.conf" "$HOME/.tmux.conf"
 
-# Claude Code writes into ~/.claude (caches, backups, settings it mutates), so
-# only link the scripts — settings.json is left as a live file. Note that the
-# hooks wiring tmux-claude-state.sh to Claude's Notification/Stop/
-# UserPromptSubmit events lives in that unmanaged settings.json, so a fresh
-# machine needs them re-added by hand.
+# Claude Code writes into ~/.claude, so only link the scripts — settings.json
+# is left as a live file. The hooks wiring tmux-claude-state.sh to Claude's
+# Notification/Stop/UserPromptSubmit events live there, so a fresh machine
+# needs them re-added by hand.
 mkdir -p "$HOME/.claude"
 ln -sf "$REPO_DIR/.claude/statusline-command.sh" "$HOME/.claude/statusline-command.sh"
 ln -sf "$REPO_DIR/.claude/tmux-claude-state.sh" "$HOME/.claude/tmux-claude-state.sh"
 
 # Skills are ours alone and Claude never rewrites them, so the whole dir can be
 # linked. Unlike the loop below this never deletes what is in the way: a real
-# non-empty skills/ dir holds skills that aren't tracked here, and losing them
-# silently would be worse than not linking.
+# non-empty skills/ dir holds skills that aren't tracked here.
 CLAUDE_SKILLS="$HOME/.claude/skills"
 if [ -d "$CLAUDE_SKILLS" ] && [ ! -L "$CLAUDE_SKILLS" ] && ! rmdir "$CLAUDE_SKILLS" 2>/dev/null; then
   echo "! $CLAUDE_SKILLS is a non-empty real directory — move its contents into" >&2
@@ -49,9 +47,8 @@ if command -v brew >/dev/null && ! command -v rg >/dev/null; then
 fi
 
 # nvim-treesitter's `main` branch compiles parsers by shelling out to the
-# `tree-sitter` CLI (the old `master` branch built them directly with cc).
-# Homebrew split this out of the library-only `tree-sitter` formula, so without
-# `tree-sitter-cli` no parsers compile and syntax highlighting silently fails.
+# `tree-sitter` CLI, which Homebrew ships separately from the library-only
+# `tree-sitter` formula. Without it, syntax highlighting silently fails.
 if command -v brew >/dev/null && ! command -v tree-sitter >/dev/null; then
   brew install tree-sitter-cli
 fi
@@ -62,17 +59,15 @@ if command -v brew >/dev/null && ! command -v delta >/dev/null; then
   brew install git-delta
 fi
 
-# Install the tmux plugin manager (TPM) and the plugins declared in .tmux.conf.
-# Without this, vim-tmux-navigator's C-h/j/k/l pane navigation silently does
-# nothing. (The status bar is styled inline in .tmux.conf, not by a plugin.)
+# Install TPM and the plugins declared in .tmux.conf; without them
+# vim-tmux-navigator's C-h/j/k/l pane navigation silently does nothing.
 TPM_DIR="$HOME/.tmux/plugins/tpm"
 if [ ! -d "$TPM_DIR" ]; then
   git clone https://github.com/tmux-plugins/tpm "$TPM_DIR"
 fi
 "$TPM_DIR/bin/install_plugins"
 
-# tmux only reads ~/.tmux.conf when the server starts, so reload any running
-# server to pick up the freshly linked config.
+# tmux only reads ~/.tmux.conf when the server starts.
 if command -v tmux >/dev/null && tmux info >/dev/null 2>&1; then
   tmux source-file "$HOME/.tmux.conf"
   echo "Reloaded running tmux server."

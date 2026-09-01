@@ -30,8 +30,7 @@ return {
 				automatic_enable = false,
 			})
 
-			-- Advertise nvim-cmp's completion capabilities to every server
-			-- (snippet support, additional text edits for auto-imports, etc.)
+			-- Advertise nvim-cmp's completion capabilities to every server.
 			local capabilities = require("cmp_nvim_lsp").default_capabilities()
 			vim.lsp.config("*", { capabilities = capabilities })
 

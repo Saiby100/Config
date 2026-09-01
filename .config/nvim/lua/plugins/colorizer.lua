@@ -9,7 +9,7 @@ return {
 			RRGGBBAA = true, -- #RRGGBBAA
 			rgb_fn = true, -- rgb() / rgba()
 			hsl_fn = true, -- hsl() / hsla()
-			css = true, -- enable all css features
+			css = true,
 			mode = "background", -- show color as the background of the hex value
 		},
 	},

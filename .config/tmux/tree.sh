@@ -1,38 +1,26 @@
 #!/bin/sh
-# One fzf popup replacing choose-tree entirely (prefix + w).
+# One fzf popup listing every session, window and pane in the server as a tree
+# (prefix + w). fzf matches incrementally across the whole row — session name,
+# window name, pane title and path at once.
 #
-# Every session, window and pane in the server is one row of a tree, and fzf
-# matches incrementally across the whole row — session name, window name, pane
-# title and path at once. choose-tree can draw the same hierarchy but cannot
-# match into it, so finding a pane meant scrolling; and create/rename/kill each
-# needed a separate binding and a separate prompt. Here they are hotkeys on the
-# row already under the cursor.
-#
-# Enter jumps to the row under the cursor. Moving things around is a mark and a
-# destination instead: m marks rows, M moves everything marked into the row the
-# cursor is on. That replaced the old `grab` and `send` modes (prefix + g and
-# prefix + G), which were the same list opened twice with a different verb on
-# enter and could only ever move one pane, always relative to the pane you
-# happened to be sitting in. Marks name both ends explicitly, so the popup no
-# longer needs a mode at all.
+# Enter jumps to the row under the cursor; m marks rows and M moves everything
+# marked into the row the cursor is on.
 #
 # The script re-enters itself: fzf's reload/execute/preview bindings all call
 # "$0" with a mode argument. Modes are `list`, `act <verb> <key>` and
 # `preview <key>`; no argument is the interactive entry.
 
 # display-popup runs a non-login sh whose PATH comes from the tmux *server's*
-# environment, which is whatever the first client happened to have. Homebrew's
-# bin is the one that goes missing on a server started from a bare env.
+# environment; Homebrew's bin is the one that goes missing.
 case ":$PATH:" in
   *:/opt/homebrew/bin:*) ;;
   *) PATH="/opt/homebrew/bin:$PATH" ;;
 esac
 export PATH
 
-# display-popup -E tears the popup down the instant the command exits, so any
-# failure that just prints and returns is invisible — it reads as the popup
-# flashing open and closing. Every abnormal exit goes through die() to hold the
-# window open long enough to read the reason.
+# display-popup -E tears the popup down the instant the command exits, so a
+# failure that just prints and returns reads as the popup flashing open and
+# closing. Every abnormal exit goes through die() to hold the window open.
 die() {
   printf '%s\n\n' "$*"
   printf 'Press enter to close.'
@@ -62,13 +50,10 @@ FOLD_FILE="${TMPDIR:-/tmp}/tmux-tree-folds"
 MARK_FILE="${TMPDIR:-/tmp}/tmux-tree-marks"
 
 # --- Palette ---------------------------------------------------------------
-# fzf does not expand tmux formats, so the onedark user options from
-# .tmux.conf are read once and turned into truecolor SGR sequences by hand.
-# One source of truth is worth the hex parsing.
-#
-# Fetched in a single display-message and parsed with expansions only. The
-# obvious version — show-options per colour, cut(1) per hex pair — cost five
-# server round-trips and a dozen forks before the list was even built, on a
+# fzf does not expand tmux formats, so the onedark user options from .tmux.conf
+# are read once and turned into truecolor SGR sequences by hand. Fetched in a
+# single display-message and parsed with expansions only: show-options per
+# colour cost five server round-trips before the list was even built, on a
 # script that reruns on every keystroke of a search.
 sgr() {
   h=${1#\#}
@@ -77,9 +62,8 @@ sgr() {
   printf '\033[38;2;%d;%d;%dm' "$((0x$r))" "$((0x${gb%??}))" "$((0x${gb#??}))"
 }
 
-# Computed once and exported, so the reload and preview children the popup
-# spawns on every keystroke inherit them instead of paying for the round-trip
-# again.
+# Computed once and exported, so the reload and preview children inherit them
+# instead of paying for the round-trip again.
 if [ -z "${C_OFF:-}" ]; then
   IFS="$TAB" read -r _blue _fg _muted _green _yellow <<EOF
 $(tmux display-message -p "#{@blue}${TAB}#{@fg}${TAB}#{@muted}${TAB}#{@green}${TAB}#{@yellow}")
@@ -95,38 +79,25 @@ EOF
 fi
 
 # --- Row formats -----------------------------------------------------------
-# One `list-panes -a` produces the whole tree. Sessions and windows do not
-# need listings of their own: every window holds at least one pane and every
-# session at least one window, so each pane line already carries its
-# ancestors, and awk emits a session or window row the first time it sees a
+# One `list-panes -a` produces the whole tree: every pane line already carries
+# its ancestors, and awk emits a session or window row the first time it sees a
 # new one. That turns three server round-trips into one.
 #
-# Padding is tmux's own #{pN:...} (pad) and #{=N:...} (clip) rather than
-# printf or column(1): both are display-width aware, so the box-drawing
-# prefixes and any wide characters in a title stay in their columns. The
-# widths differ per depth so the meta column lines up under the deeper prefix.
+# Padding is tmux's own #{pN:...} (pad) and #{=N:...} (clip) rather than printf
+# or column(1): both are display-width aware, so the box-drawing prefixes and
+# any wide characters in a title stay in their columns.
 #
-# pane_title defaults to the hostname, so a pane where nothing set a title
-# would show the machine name on every row; that case falls back to the
-# running command, the same suppression pane-border-format uses in .tmux.conf.
-# Claude Code keeps pane_title set to what the session is about ("Obsidian
-# vault organization"), which identifies a pane far better than the window
-# name or the command (Claude reports a version string, not "claude").
+# pane_title defaults to the hostname, so that case falls back to the running
+# command — the same suppression pane-border-format uses in .tmux.conf.
 #
-# Fields 12 and 13 are the ancestry column, drawn only while searching (see
-# emit below). A search filters the tree down to the matching rows, and a pane
-# row on its own says nothing about which session or window it came out of —
-# the connector to its parent is still drawn, but the parent itself has been
-# filtered away. So each row also carries the names of its ancestors, ready to
-# print when there is no tree left to read them off.
+# Fields 12 and 13 are the ancestry column, drawn only while searching: a
+# filtered pane row has lost the parent rows that said where it came from.
 #
 # The last three are Claude Code's state, written by ~/.claude/tmux-claude-state.sh
-# at pane, window and session scope under three separate names. Every field here
-# is evaluated in pane context, so a pane carries its own state *and* its
-# window's and session's — which is what lets a folded session or window row
-# still show that something inside it finished. The scopes are named separately
-# precisely so this works: were they one name, tmux's pane → window → session
-# option fallback would hand every pane its window's state as its own.
+# at pane, window and session scope under three separate names. Every field is
+# evaluated in pane context, so a pane carries its own state *and* its window's
+# and session's — which is what lets a folded session or window row still show
+# that something inside it finished.
 ROW_FMT="#{session_name}${TAB}#{session_windows}${TAB}#{p46:#{=45:#{session_name}}}${TAB}#{session_windows} window#{?#{==:#{session_windows},1},,s}\
 ${TAB}#{window_index}${TAB}#{window_panes}${TAB}#{p45:#{=44:#{window_name}}}${TAB}#{window_panes} pane#{?#{==:#{window_panes},1},,s}\
 ${TAB}#{pane_id}${TAB}#{p42:#{=41:#{?#{==:#{pane_title},#{host}},#{pane_current_command},#{pane_title}}}}${TAB}#{s|^$HOME|~|:pane_current_path}\
@@ -134,61 +105,32 @@ ${TAB}#{p28:#{=27:#{session_name}}}${TAB}#{p28:#{=27:#{session_name} › #{windo
 ${TAB}#{@claude_pane_state}${TAB}#{@claude_state}${TAB}#{@claude_session_state}"
 
 # --- Building the list -----------------------------------------------------
-# A fold hides rows, and a hidden row cannot be fuzzy-matched — which would
-# make "search for a pane anywhere" and "start with the other sessions
-# collapsed" mutually exclusive. So folds only apply while the query is empty:
-# the moment you type, the whole tree is in the list, and clearing the query
-# folds it back up.
+# A fold hides rows, and a hidden row cannot be fuzzy-matched, so folds only
+# apply while the query is empty: the moment you type, the whole tree is in the
+# list, and clearing the query folds it back up.
 #
-# Rows come out as key TAB coloured-display, and fzf is given --with-nth=2..
-# so the key is hidden and, more importantly, never matched against —
-# searching for "p" should not hit every pane row.
+# Rows come out as key TAB coloured-display, with --with-nth=2.. so the key is
+# hidden and never matched against.
 #
-# Last children get the elbow so each trunk actually ends; the counts come
-# from session_windows and window_panes rather than a lookahead. Every
-# connector is three display cells wide, which is what keeps the column
-# padding tmux already did in the format string honest.
-#
-# Every row is numbered, and `:N` moves the cursor to row N. The number is the
-# row's position in the list, not any tmux index: a window index only addresses
-# a window inside its own session, so it cannot name the row you are looking at
-# here — which is why the window label no longer carries one. Being a position
-# also means the numbers renumber as folds open and close, which is the point,
-# since what you type is always what you can see.
-#
-# They are drawn only while the query is empty, the same rule as folds and for
-# the same reason: fzf filters the list after awk has numbered it, so under a
-# search the numbers on screen would no longer be the positions they name.
+# Row numbers (`:N` jumps to one) are positions in the list, not tmux indexes,
+# and are drawn only while the query is empty — fzf filters the list after awk
+# has numbered it, so under a search the numbers on screen would no longer be
+# the positions they name.
 #
 # Four fixed-width columns sit in front of every label: a four-cell number
 # gutter, a two-cell mark gutter, a two-cell Claude-state gutter and a two-cell
-# type icon. All four are the same width on every row whatever it holds, so the
-# label padding tmux already did in ROW_FMT still lines the meta column up; only
-# a *varying* width would have to be paid for there.
+# type icon. Being fixed on every row is what keeps the label padding tmux
+# already did in ROW_FMT honest.
 #
-# The state gutter is the same ● the tmux status bar draws, yellow for waiting
-# and green for done, and it sits on session and window rows as well as panes.
-# That is the whole point of it: the status bar can only tell you that *some
-# other* session has Claude waiting, and this is where you find out which pane —
-# including when the session or window holding it is folded shut.
+# The state gutter is the same ● the tmux status bar draws, and sits on session
+# and window rows as well as panes — that is how you find which pane is waiting
+# when the session or window holding it is folded shut.
 #
-# The icon is what tells a window row from a pane row. They were both plain fg
-# text before, distinguishable only by how deep the connector ran, which is one
-# glyph of difference three columns to the left of where you are reading. The
-# colours differ now too (windows bold), but the icon is the part that reads at
-# a glance. Glyphs are Nerd Font — ghostty is set to JetBrainsMono Nerd Font,
-# and tmux inherits it.
-#
-# The ancestry column sits between the label and the meta, not in front of the
-# row: in front it would have to be part of the prefix, whose width is what the
-# per-depth label padding above is compensating for, and a session name is not
-# a fixed width. After the label, where every row is already flush, a column of
-# tmux-padded ancestry keeps the meta flush too. It is blue rather than muted
-# so it reads as the session/window rows it names rather than as more meta.
-#
-# fzf matches the display column, so the ancestry is matched as well — which is
-# the other half of the fix: "mrm claude" finds the Claude pane in the MRM
-# window even though neither the pane title nor its path says MRM.
+# The ancestry column sits between the label and the meta, where every row is
+# already flush; in front it would break the per-depth label padding. fzf
+# matches the display column, so it is matched too: "mrm claude" finds the
+# Claude pane in the MRM window even though neither its title nor its path
+# says MRM.
 TREE_AWK='
 function emit(key, prefix, colour, icon, label, anc, meta, state,   c, g, n, d) {
   c = (key == srcpane) ? ccur : colour
@@ -270,27 +212,21 @@ pause() {
 }
 
 # --- Moving marked rows -----------------------------------------------------
-# m marks a row; M drops everything marked into the row the cursor is on. That
-# is the whole of what used to be `grab` and `send`: those could only move the
-# one pane you were sitting in, to or from one place, and needed two bindings
-# and two modes to say which direction. A mark names the source and the cursor
-# names the destination, so one key covers both directions and any number of
-# rows at once.
+# m marks a row; M drops everything marked into the row the cursor is on, so
+# one key covers both directions and any number of rows at once.
 #
 # A pane can live in any window, so it goes to the window holding the chosen
-# row. A window has no such freedom — a window cannot sit inside another window
-# — so a marked window takes the chosen row's *session* instead. That is what
-# makes M on a pane row meaningful for a marked window rather than an error: it
-# reads as "the session that pane is in".
+# row. A window cannot sit inside another window, so a marked window takes the
+# chosen row's *session* instead — which is what makes M on a pane row
+# meaningful for a marked window rather than an error.
 #
-# Rows already at their destination are skipped rather than refused, so a mixed
-# bag of marks does as much as it can; only real failures are reported.
+# Rows already at their destination are skipped rather than refused; only real
+# failures are reported.
 #
-# join-pane names its source with -s. Without it tmux prefers the *marked*
-# pane — tmux's own select-pane -m mark, which the status-bar drag bindings in
-# .tmux.conf set — and a leftover one there would move a pane nobody chose. -d
-# on both moves keeps focus where it is: the point of arranging from a list is
-# that you are arranging, not following.
+# join-pane names its source with -s. Without it tmux prefers its own marked
+# pane (select-pane -m, which the status-bar drag bindings in .tmux.conf set),
+# and a leftover one there would move a pane nobody chose. -d on both moves
+# keeps focus where it is.
 move_marked() {
   dst=$1
   if [ ! -s "$MARK_FILE" ]; then
@@ -353,10 +289,8 @@ move_marked() {
 # fold.
 #
 # Anything that needs a name or a confirmation is handed it as $4 rather than
-# reading it here. That is the whole reason act() no longer prompts: a prompt
-# of its own needs the terminal, and fzf only gives a child the terminal by
-# painting it over the list. See Prompt mode below for where the typing happens
-# instead.
+# reading it here: a prompt of its own needs the terminal, and fzf only gives a
+# child the terminal by painting it over the list. See Prompt mode below.
 act() {
   verb=$1 key=$2 pos=$3 text=$4
   [ -n "$key" ] || exit 0
@@ -375,9 +309,8 @@ act() {
       touch "$FOLD_FILE"
       if grep -qxF "$key" "$FOLD_FILE"; then
         [ "$verb" = collapse ] && exit 0
-        # Not `grep ... && mv`: grep exits 1 when it selects no lines, and
-        # unfolding the last folded row is exactly that case — so the mv was
-        # skipped and the row never opened. The redirection has already
+        # Not `grep ... && mv`: grep exits 1 when it selects no lines, which is
+        # exactly the unfold-the-last-row case. The redirection has already
         # written the (possibly empty) file by then, so move it regardless.
         grep -vxF "$key" "$FOLD_FILE" > "$FOLD_FILE.tmp"
         mv "$FOLD_FILE.tmp" "$FOLD_FILE"
@@ -387,11 +320,9 @@ act() {
       fi
       ;;
     new)
-      # What "new" means is read off the cursor: a sibling of whatever it sits
-      # on. Sessions and windows are named — an unnamed one is exactly the one
-      # you forget is open, the same reasoning as bind c/C in .tmux.conf. Panes
-      # have no name to ask for, which is why p: is the one row where n does
-      # not open a prompt.
+      # "new" is a sibling of whatever the cursor sits on. Sessions and windows
+      # are named, for the same reason as bind c/C in .tmux.conf; panes have no
+      # name to ask for, which is why p: is the one row where n does not prompt.
       case $key in
         s:*) tmux new-session -d -s "$text" -c "$(cwd_of "$tgt")" ;;
         # -a inserts after the window under the cursor; without it a bare
@@ -406,18 +337,15 @@ act() {
         w:*) tmux rename-window -t "$tgt" "$text"
              # automatic-rename is on globally in .tmux.conf, so a hand-typed
              # name would be overwritten by the directory basename on the next
-             # cd. tmux does turn it off itself on rename-window, but saying so
-             # explicitly costs nothing and does not depend on that staying true.
+             # cd. rename-window does turn it off itself; saying so is free.
              tmux set-window-option -t "$tgt" automatic-rename off ;;
         p:*) tmux select-pane -t "$tgt" -T "$text" ;;
       esac
       ;;
     kill)
-      # Only sessions confirm, and the confirmation happens before act() is
-      # reached — a session takes every window and pane with it, and a mistyped
-      # fuzzy match is a real way to lose one; a pane or window is cheap enough
-      # that a confirmation on every kill would defeat the point of having the
-      # key here at all.
+      # Only sessions confirm, before act() is reached: a session takes every
+      # window and pane with it, while a pane or window is cheap enough that
+      # confirming every kill would defeat the point of the key.
       case $key in
         s:*) tmux kill-session -t "$tgt" ;;
         w:*) tmux kill-window -t "$tgt" ;;
@@ -426,9 +354,7 @@ act() {
       ;;
     mark)
       # Same toggle-in-a-file shape as the folds above, and the same reason the
-      # mv is unconditional: grep exits 1 when it selects no lines, which is
-      # exactly the unmark-the-last-mark case, and the redirection has already
-      # written the file by then.
+      # mv is unconditional.
       touch "$MARK_FILE"
       if grep -qxF "$key" "$MARK_FILE"; then
         grep -vxF "$key" "$MARK_FILE" > "$MARK_FILE.tmp"
@@ -442,32 +368,25 @@ act() {
   esac
 }
 
-# A reload drops the cursor at the top of the list, which after folding a row
-# or renaming one means losing your place. fzf ships --track --id-nth for
-# exactly this and it worked, but it is unusable here: tracking blocks query
-# input while it re-finds the row after each reload, and this list reloads on
-# every keystroke of a search, so fast typing lost characters — "test" arrived
-# as "tt". So the cursor is placed by hand instead.
+# A reload drops the cursor at the top of the list, which after folding or
+# renaming a row means losing your place. fzf's --track --id-nth is unusable
+# here: tracking blocks query input while it re-finds the row after each
+# reload, and this list reloads on every keystroke, so fast typing lost
+# characters. So the cursor is placed by hand instead.
 #
-# Each action works out where the cursor should end up and leaves the answer
-# in a file for a transform after the reload to read back as a pos() action.
-# The handoff is a file rather than the obvious transform argument because fzf
-# expands {1} and {n} separately for each action in a chain, at the moment
-# that action runs: by the time a trailing transform fires the reload has
-# already happened, and both describe the row the cursor accidentally landed
-# on. Only the first action in the chain still sees the row you acted on.
+# Each action leaves the answer in a file for a transform after the reload to
+# read back as a pos() action. A file rather than the obvious transform
+# argument because fzf expands {1} and {n} separately for each action in a
+# chain, at the moment that action runs — by the time a trailing transform
+# fires, both describe the row the cursor accidentally landed on.
 POS_FILE="${TMPDIR:-/tmp}/tmux-tree-pos"
 
-# Always writes: an empty transform leaves the cursor wherever the reload put
-# it, which is the top. Most actions leave the row where it was, so the answer
-# is usually just where the cursor already is — $2 is its zero-based index, so
-# +1 makes it the 1-based position fzf's pos() wants. The exception is h on a
-# pane, which closes the window above it: that pane sits exactly pane_index
-# rows below its window row, panes being listed in index order.
-# Marking is the other exception, in the opposite direction: marking a run of
-# panes is the common case, so m steps down a row afterwards the way it does in
-# the Telescope buffer picker. fzf clamps a pos() past the end, so the last row
-# needs no special case.
+# Always writes: an empty transform leaves the cursor where the reload put it,
+# which is the top. $2 is the row's zero-based index, so +1 is the 1-based
+# position pos() wants. h on a pane is the exception — it closes the window
+# above, which sits exactly pane_index rows up. Marking goes the other way: m
+# steps down a row so a run of panes can be marked in sequence. fzf clamps a
+# pos() past the end, so the last row needs no special case.
 save_pos() {
   _off=0
   case $3:$1 in
@@ -478,28 +397,20 @@ save_pos() {
 }
 
 # --- Modal editing ---------------------------------------------------------
-# fzf has no modes, but it has unbind() and rebind(), and that is enough to
-# build one: every normal-mode key is declared as a binding, i/a// unbind the
-# lot so they type like ordinary characters again (insert mode), and esc
-# rebinds them (normal mode).
+# fzf has no modes, but it has unbind() and rebind(): every normal-mode key is
+# declared as a binding, i/a// unbind the lot so they type like ordinary
+# characters again (insert mode), and esc rebinds them (normal mode).
 #
 # The popup opens in normal mode — bindings live, no `start:unbind` — because
-# the first thing you do here is almost always move to a row you can already
-# see, and reaching a visible row should not cost a mode switch. Searching is
-# the fallback for when it is not on screen, and that is what i and / are for.
+# the first thing you do is almost always move to a row you can already see.
 #
-# Only rebind() can turn a binding back on, and only for a key that was
-# declared at startup — which is why the dead keys below have to be declared
-# rather than simply left out.
-#
-# The dead keys are the point of having modes at all. Without them a stray `w`
-# in normal mode would silently land in the query and start filtering, so the
-# mode would only be as real as your memory of which letters do something.
-# Bound to ignore, normal mode is inert except where it is not.
+# Only rebind() can turn a binding back on, and only for a key declared at
+# startup, which is why the dead keys below have to be declared rather than
+# left out. Bound to ignore, they keep a stray `w` out of the query.
 #
 # There is a third mode: prompt mode, where the query line is borrowed as the
-# input box for a name or a confirmation. It unbinds the same set — the keys
-# have to type for it too — and is unwound by enter or esc. See Prompt mode.
+# input box for a name or a confirmation. It unbinds the same set and is
+# unwound by enter or esc. See Prompt mode.
 VIM_NAV='j,k,g,G,d,u,:'
 VIM_MODE='i,a,/,q'
 VIM_ACT='h,l,n,r,x,p,m,M,U'
@@ -515,26 +426,21 @@ done
 MODAL_KEYS="$VIM_NAV,$VIM_MODE,$VIM_ACT${dead_keys}"
 dead_binds=${dead_binds#,}
 
-# The prompt is the mode indicator twice over. It says what the query line is
-# for — "Search" normally, the action's own label while one is pending — and it
-# is yellow in normal mode for the same reason the status bar turns yellow while
-# the prefix is pending: yellow here means "the next key does something other
-# than what it says". Since the popup starts in normal mode, that is also the
-# prompt it opens with.
+# The prompt says what the query line is for — "Search" normally, the action's
+# own label while one is pending — and is yellow in normal mode for the same
+# reason the status bar is while the prefix is pending: the next key does
+# something other than what it says.
 P_TAIL='> '
 P_INSERT="Search $P_TAIL"
 P_NORMAL="$C_YELLOW$P_INSERT"
 
 # --- Prompt mode -----------------------------------------------------------
 # Naming a new window, renaming a row, confirming a kill and jumping to a row
-# number all need a line of text. They used to read it in an execute() child,
-# which fzf gives the terminal to — so the child's prompt painted over the very
-# tree you were about to act on, and you typed a new name for a row you could
-# no longer see.
+# number all need a line of text. Read in an execute() child, fzf gives that
+# child the terminal, so its prompt paints over the tree you are acting on.
 #
-# So the query line is borrowed instead. It is already an input box sitting
-# under the list; the only reasons it filters and searches are two bindings and
-# a flag, and fzf can turn all three off:
+# So the query line is borrowed instead. The only reasons it filters and
+# searches are two bindings and a flag, and fzf can turn all three off:
 #
 #   disable-search   what you type stops filtering the list, but {q} still
 #                    carries it, so the tree stays whole and on screen
@@ -543,8 +449,8 @@ P_NORMAL="$C_YELLOW$P_INSERT"
 #   change-prompt    the label says which prompt this is
 #
 # What is pending lives in a file, since fzf holds no state of its own: enter
-# and esc are one binding each and have to work out from somewhere whether
-# there is a prompt open to commit or cancel.
+# and esc are one binding each and have to work out whether there is a prompt
+# open to commit or cancel.
 PEND_FILE="${TMPDIR:-/tmp}/tmux-tree-pending"
 
 # The label is the only thing that says which prompt is open, so it names the
@@ -656,44 +562,30 @@ command -v fzf >/dev/null 2>&1 || die "fzf not found on PATH.
 PATH was:
 $PATH"
 
-# Resolved here rather than passed in from the binding, because display-popup
-# does NOT format-expand its shell-command — passing '#{pane_id}' handed the
-# script the literal placeholder. Asking tmux from inside the popup works: the
-# popup belongs to the client, so these resolve against the client's active
-# pane, not against the popup itself. Exported so the reload/execute children
-# see the same answers.
+# Resolved here rather than passed in from the binding: display-popup does NOT
+# format-expand its shell-command, so '#{pane_id}' arrived as the literal
+# placeholder. The popup belongs to the client, so this resolves against the
+# client's active pane. Exported so the reload/execute children see it too.
 SRC_PANE=$(tmux display-message -p '#{pane_id}')
 export SRC_PANE
 [ -n "$SRC_PANE" ] || die "could not determine the current tmux pane."
 
-# Folds are reseeded on every open rather than persisted: the popup opens on the
-# whole tree — the question it answers is what is open everywhere, not just here
-# — and a fold you set is only ever meant to last as long as the popup is up.
+# Folds and marks are reseeded on every open rather than persisted: a fold is
+# only meant to last as long as the popup is up, and a leftover mark would name
+# a row you have since forgotten about — and M would move it.
 : > "$FOLD_FILE"
-# Marks are reseeded empty for the same reason, and more strongly: a mark left
-# over from a previous popup would name a row you have since forgotten about,
-# and M would move it.
 : > "$MARK_FILE"
 rm -f "$POS_FILE" "$PEND_FILE"
 
 
-# ctrl-based keys work in both modes, so nothing has to be remembered twice:
-# normal mode adds unshifted aliases, and everything that stays in the popup
-# has a ctrl form reachable from a search too. Marking during a search is the
-# reason that matters here — a search is exactly how you reach the rows you
-# want to mark, and having to leave it for each one would undo the point.
+# ctrl-based keys work in both modes, so nothing has to be remembered twice.
+# Marking during a search is the reason that matters: a search is how you reach
+# the rows you want to mark. Folding is the exception — h/l only, since a tree
+# wants a direction rather than a toggle and there is no unmodified pair to
+# alias it to. Enter and esc mean different things in different modes, so both
+# ask the script which it is.
 #
-# Folding is the exception: it is h/l only, with no ctrl alias. A tree wants a
-# direction rather than a toggle — h always closes, l always opens, whatever
-# the row is doing now — and there is no unmodified pair to alias it to.
-#
-# Enter and esc are the two keys with no ctrl form and no dead twin, because
-# they are the only ones that mean different things in different modes: enter
-# jumps or commits, esc leaves a search or cancels a prompt. Both ask the script
-# which it is, since fzf holds no state to ask.
-# Only the keys you would not guess. j/k, h/l, g/G, d/u, enter and esc all do
-# what they do everywhere else, and a header listing them costs a row of tree
-# to say so.
+# The header lists only the keys you would not guess.
 header=':N row  n new  r rename  x kill  m mark  M move marked  U unmark  / search'
 
 out=$(list | fzf \

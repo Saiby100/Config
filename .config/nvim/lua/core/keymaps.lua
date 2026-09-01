@@ -98,14 +98,10 @@ map("n", "<leader>m", function() vim.fn.system("tmux resize-pane -Z") end, opts)
 -- Y : copy a Claude-friendly file reference to the system clipboard
 --   normal mode → @~/abs/path              (e.g. @~/Developer/Config/.../keymaps.lua)
 --   visual mode → @~/abs/path L<start>-<end> (e.g. @~/Developer/Config/.../keymaps.lua L94-110)
--- The path is the absolute path with $HOME collapsed to '~' (the :~ modifier).
 -- '~' is expanded by Claude's file reader, so the reference resolves from ANY
--- cwd/added directory — unlike a cwd-relative path — while leaking no username
--- and staying portable. The '@' is Claude Code's file-mention syntax: it
--- attaches the file to context up front, no Read round-trip. A space-separated
--- 'L<start>-<end>' suffix scopes the mention to the highlighted lines while
--- keeping the auto-attach, so both forms get the '@' prefix.
--- Overrides the default normal-mode Y (synonym for yy).
+-- cwd — unlike a cwd-relative path — while leaking no username. The '@' is
+-- Claude Code's file-mention syntax: it attaches the file to context up front,
+-- no Read round-trip. Overrides the default normal-mode Y (synonym for yy).
 -- ------------------------------------------------------------------
 local function yank_file_ref(with_range)
 	local path = vim.fn.fnamemodify(vim.fn.expand("%:p"), ":~")
@@ -136,15 +132,13 @@ end, opts)
 
 -- ------------------------------------------------------------------
 -- <leader>gg : toggle lazygit in a floating terminal
--- Runs lazygit *inside* this Neovim session (the long-lived host) instead of
--- the other way around, so the editor session is never lost. Hiding the window
--- (rather than killing the buffer) keeps the lazygit process running, so
--- reopening lands on the exact same state. When lazygit is launched from here,
--- Neovim sets $NVIM; the lazygit config pins `os.editPreset: nvim-remote`, which
--- routes its `e` (edit) command through `nvim --server $NVIM --remote` — files
--- open as buffers in THIS session, not a nested nvim. (Pinning is required: left
--- to auto-detect, lazygit picks the plain `nvim` preset from $EDITOR and nests.
--- The preset's built-in fallback keeps the shell `lg` alias working standalone.)
+-- Runs lazygit *inside* this Neovim session instead of the other way around,
+-- so the editor session is never lost. Hiding the window (rather than killing
+-- the buffer) keeps the lazygit process running, so reopening lands on the
+-- exact same state. Neovim sets $NVIM when it launches lazygit; the lazygit
+-- config pins `os.editPreset: nvim-remote` so its `e` opens files as buffers in
+-- THIS session rather than a nested nvim (left to auto-detect it picks the
+-- plain `nvim` preset from $EDITOR and nests).
 -- ------------------------------------------------------------------
 local lazygit = { buf = -1, win = -1 }
 
@@ -182,10 +176,8 @@ vim.api.nvim_create_autocmd("VimResized", {
 
 -- Directory to launch lazygit in. Normally nil (inherit nvim's cwd), but when
 -- the cwd isn't inside a git repo, fall back to the most recent repo from
--- lazygit's own state file. Launching *inside* a repo matters: started outside
--- one, lazygit either prompts (notARepository: prompt) or — even with `skip` —
--- cds to the recent repo but force-opens the recent-repos menu on top
--- (hardcoded in its app setup; no config to disable it).
+-- lazygit's own state file. Started outside a repo, lazygit either prompts or
+-- — even with `skip` — force-opens the recent-repos menu on top.
 local function lazygit_cwd()
 	if vim.fs.root(vim.fn.getcwd(), ".git") then
 		return nil
@@ -254,13 +246,11 @@ local function toggle_lazygit()
 		vim.schedule(function()
 			pcall(vim.keymap.del, "t", "<Esc><Esc>", { buffer = lazygit.buf })
 		end)
-		-- Restore tmux pane navigation from inside the float. The buffer sits in
-		-- terminal-insert mode (above), where the global normal-mode
-		-- <C-h/j/k/l> → TmuxNavigate maps don't apply — so the keys would
-		-- otherwise be swallowed by lazygit. The float is fullscreen with no
-		-- nvim splits to move between, so switch the tmux pane directly rather
-		-- than via TmuxNavigate (whose wincmd logic would drop focus into the
-		-- editor behind the float). No-op when nvim runs outside tmux.
+		-- Restore tmux pane navigation from inside the float: the buffer sits in
+		-- terminal-insert mode, where the global <C-h/j/k/l> maps don't apply. The
+		-- float is fullscreen with no splits to move between, so switch the tmux
+		-- pane directly rather than via TmuxNavigate (whose wincmd logic would drop
+		-- focus into the editor behind the float). No-op outside tmux.
 		for key, dir in pairs({ ["<C-h>"] = "L", ["<C-j>"] = "D", ["<C-k>"] = "U", ["<C-l>"] = "R" }) do
 			vim.keymap.set("t", key, function()
 				if vim.env.TMUX then
@@ -284,13 +274,10 @@ map("n", "<leader>gg", toggle_lazygit, { desc = "Toggle lazygit" })
 -- ------------------------------------------------------------------
 -- Fixup for lazygit's `e` (see lazygit/config.yml). lazygit runs in the float,
 -- so the float is nvim's *current* window when its `--remote {{filename}}` edit
--- arrives — the file gets dropped into the cramped, minimal-style float instead
--- of the editor. lazygit then calls this via `--remote-expr`: the float now
--- shows the just-opened file, so we grab that buffer, restore the lazygit
--- terminal into the float and hide it (keeping lazygit running, ready to
--- reopen), then show the file in whatever real window we land on — so it opens
--- like a normal buffer and joins the buffer list (telescope, :ls, etc.).
--- Scheduled so the window work runs outside the --remote-expr eval context.
+-- arrives, and the file lands in the cramped float. lazygit then calls this via
+-- `--remote-expr`: grab the just-opened buffer, restore the lazygit terminal
+-- into the float and hide it, then show the file in a real window so it joins
+-- the buffer list. Scheduled to run outside the --remote-expr eval context.
 -- ------------------------------------------------------------------
 function _G._lazygit_fixup(line)
 	vim.schedule(function()

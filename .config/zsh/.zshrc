@@ -26,7 +26,6 @@ zmodload zsh/complist
 compinit
 _comp_options+=(globdots)               # Include hidden files.
 
-# Load aliases and shortcuts if existent.
 [ -f "$HOME/.config/zsh/.zsh/aliasrc" ] && source "$HOME/.config/zsh/.zsh/aliasrc"
 
 
@@ -80,16 +79,13 @@ function obs() {
 #   ts on/off   explicit
 #   ts status   passthrough to `tailscale status`
 #
-# The two have to move together: on Apple Silicon, closing the lid triggers
-# clamshell sleep, which overrides both caffeinate assertions and `pmset -c
-# sleep 0`. `pmset -a disablesleep` is the only knob that survives it — and it
-# is system-wide, so leaving the VPN on while unplugged keeps the Mac fully
-# awake on battery. That is the trade for not running a power-source daemon:
-# remember to `ts off`.
+# The two have to move together: on Apple Silicon, clamshell sleep overrides
+# both caffeinate assertions and `pmset -c sleep 0`, and `pmset -a disablesleep`
+# — the only knob that survives it — is system-wide, so leaving the VPN on while
+# unplugged keeps the Mac fully awake on battery. Remember to `ts off`.
 #
-# tailscale up/down and pmset both need root and no operator is configured, so
-# `sudo -v` primes the credential cache once up front — one password prompt per
-# toggle rather than two.
+# tailscale up/down and pmset both need root, so `sudo -v` primes the credential
+# cache once up front — one password prompt per toggle rather than two.
 function ts() {
   emulate -L zsh
   local want="${1:-}"
@@ -161,8 +157,8 @@ _source_first \
   /usr/local/etc/profile.d/autojump.sh
 
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
 
 # Machine-local overrides — keep this last so it can override anything above.
 [ -f "$HOME/.zshrc.local" ] && source "$HOME/.zshrc.local"

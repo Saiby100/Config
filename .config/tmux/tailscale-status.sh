@@ -1,21 +1,14 @@
 #!/bin/sh
-# The Tailscale glyph in status-right. Prints one styled character; tmux expands
-# the #[fg=...] tag that comes back from #().
+# The Tailscale glyph in status-right. Prints one styled character; tmux
+# expands the #[fg=...] tag that comes back from #().
 #
 # Three states, because "not connected" has two very different causes:
 #   green  — mesh is up
 #   grey   — tailscaled is alive but the VPN is down (`ts off`, or logged out)
 #   red    — tailscaled itself is unreachable, so `ts on` won't help
-#
-# The colours are read back out of tmux rather than hardcoded, so the palette at
-# the top of .tmux.conf stays the single source of truth. Doing the branching
-# here (instead of with #{?...} conditionals in status-right) also keeps this to
-# a single #() invocation per redraw — tmux substitutes the command once per
-# branch it appears in.
 
-# display-popup/#() run with the tmux *server's* PATH, which is whatever the
-# first client happened to have. Homebrew's bin is the one that goes missing on a
-# server started from a bare env — same guard as tree.sh.
+# #() runs with the tmux *server's* PATH, which is whatever the first client
+# happened to have; Homebrew's bin is the one that goes missing.
 case ":$PATH:" in
   *:/opt/homebrew/bin:*) ;;
   *) PATH="/opt/homebrew/bin:$PATH" ;;
